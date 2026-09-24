@@ -1,18 +1,18 @@
 :root {
-    --bg-primary: #000000;
-    --bg-secondary: #0a0a0a;
-    --surface: #050505;
-    --surface-hover: #111111;
-    --color-primary: #10b981;
-    --color-primary-hover: #059669;
-    --color-primary-dim: rgba(16, 185, 129, 0.1);
-    --color-border: #1a1a1a;
+    --bg-primary: #080304;
+    --bg-secondary: #19070a;
+    --surface: rgba(24, 7, 10, 0.88);
+    --surface-hover: rgba(52, 10, 16, 0.94);
+    --color-primary: #ff3b3b;
+    --color-primary-hover: #dc2626;
+    --color-primary-dim: rgba(255, 59, 59, 0.14);
+    --color-border: rgba(255, 72, 72, 0.22);
     --color-text: #ffffff;
     --color-text-muted: #a0a0a0;
     --color-danger: #ef4444;
     --color-danger-hover: #dc2626;
     --shadow-sm: 0 1px 2px rgba(0,0,0,0.5);
-    --shadow-md: 0 4px 12px rgba(16, 185, 129, 0.08);
+    --shadow-md: 0 8px 24px rgba(255, 40, 40, 0.12);
 }
 
 ::-webkit-scrollbar {
@@ -782,3 +782,87 @@ textarea.input-field {
     .modal { max-height: 80vh; margin-top: 20px; margin-bottom: 20px; }
     .CodeMirror { height: 250px !important; }
 }
+
+
+/* CihuyAkz Studio Lite — red gradient theme */
+body {
+    background:
+        radial-gradient(circle at 10% -10%, rgba(255, 32, 32, 0.20), transparent 34%),
+        radial-gradient(circle at 90% 10%, rgba(180, 0, 30, 0.18), transparent 30%),
+        linear-gradient(135deg, #050203 0%, #170508 48%, #060203 100%);
+    background-attachment: fixed;
+}
+
+.navbar {
+    background:
+        linear-gradient(90deg, rgba(12, 0, 2, 0.96), rgba(92, 5, 17, 0.90), rgba(12, 0, 2, 0.96));
+    border-bottom-color: rgba(255, 72, 72, 0.26);
+    box-shadow: 0 8px 30px rgba(110, 0, 20, 0.16);
+}
+
+.script-card,
+.admin-item,
+.modal,
+.code-box,
+.editor-container,
+.bot-form-container,
+.stat-card {
+    background:
+        linear-gradient(145deg, rgba(39, 8, 13, 0.92), rgba(13, 4, 6, 0.94));
+    border-color: rgba(255, 74, 74, 0.22);
+}
+
+.script-card:hover,
+.admin-item:hover {
+    border-color: rgba(255, 90, 90, 0.62);
+    box-shadow: 0 12px 32px rgba(255, 24, 40, 0.14);
+}
+
+.btn-primary,
+.btn:not(.btn-secondary):not(.btn-danger) {
+    background: linear-gradient(135deg, #ff4b4b 0%, #d7193f 55%, #9f1239 100%);
+    border-color: rgba(255,255,255,0.10);
+}
+
+.btn-primary:hover,
+.btn:not(.btn-secondary):not(.btn-danger):hover {
+    background: linear-gradient(135deg, #ff6666 0%, #ef274d 55%, #be123c 100%);
+}
+
+.btn-secondary:hover {
+    border-color: rgba(255, 74, 74, 0.50);
+    background: rgba(95, 13, 23, 0.68);
+}
+
+#search:focus,
+.input-field:focus,
+.textarea-field:focus,
+.select-field:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(255, 59, 59, 0.10);
+}
+
+.badge-public,
+.meta-badge {
+    background: rgba(255, 59, 59, 0.12);
+    color: #ffb0b0;
+    border-color: rgba(255, 84, 84, 0.22);
+}
+
+.sidebar-link.active {
+    color: #ff7a7a;
+    background: linear-gradient(90deg, rgba(255, 59, 59, 0.16), rgba(155, 18, 55, 0.08));
+}
+
+.editor-header,
+.admin-header,
+.toolbar {
+    background: linear-gradient(90deg, rgba(52, 8, 14, 0.85), rgba(17, 4, 7, 0.92));
+    border-color: rgba(255, 72, 72, 0.20);
+}
+
+::selection {
+    background: rgba(255, 59, 59, 0.28);
+    color: #fff;
+}
+

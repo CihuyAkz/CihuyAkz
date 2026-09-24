@@ -1277,8 +1277,8 @@ const app = {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapedScriptId} - Leaf's Scripts</title>
-    <link rel="icon" type="image/png" href="https://yt3.ggpht.com/wrMKTrl_4TexkVLuTILn1KZWW6NEbqTyLts9UhZNZhzLkOEBS13lBAi3gVl1Q465QruIDSwCUQ=s160-c-k-c0x00ffffff-no-rj">
+    <title>${escapedScriptId} - CihuyAkz Studio Lite</title>
+    <link rel="icon" type="image/png" href="../../assets/youtube-icon.svg">
     <link rel="stylesheet" href="../../style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1288,8 +1288,8 @@ const app = {
         <div class="nav-content">
             <div class="nav-left">
                 <a href="../../index.html" class="brand" style="text-decoration: none; color: inherit;">
-                    <img src="https://yt3.ggpht.com/wrMKTrl_4TexkVLuTILn1KZWW6NEbqTyLts9UhZNZhzLkOEBS13lBAi3gVl1Q465QruIDSwCUQ=s160-c-k-c0x00ffffff-no-rj" class="nav-icon" alt="Icon">
-                    <span class="nav-title" style="color:#ffffff;">Leaf's Scripts</span>
+                    <img src="../../assets/youtube-icon.svg" class="nav-icon" alt="Icon">
+                    <span class="nav-title" style="color:#ffffff;">CihuyAkz Studio Lite</span>
                 </a>
             </div>
             <div class="nav-right">
