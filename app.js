@@ -1,17 +1,9 @@
 const CONFIG = {
     // GitHub repository used for publishing. Only this GitHub account may log in.
-    repoOwner: 'CihuyAkz',
-    repo: 'CihuyAkz',
+    repoOwner: 'simplyIeaf',
+    repo: 'simplyIeaf.github.io',
     allowedUser: 'CihuyAkz',
     branch: 'main',
-    // Community features use GitHub Discussions through giscus. Fill these IDs from giscus.app after enabling Discussions.
-    giscus: {
-        repo: 'CihuyAkz/CihuyAkz',
-        repoId: '',
-        category: 'General',
-        categoryId: '',
-        lang: 'id'
-    },
     cacheBuster: () => Date.now()
 };
 
@@ -87,6 +79,111 @@ const utils = {
     }
 };
 
+
+const metrics = {
+    storageKey: 'cihuyakz_metrics_v1',
+    presenceKey: 'cihuyakz_presence_v1',
+    sessionKey: 'cihuyakz_session_id_v1',
+    presenceTimer: null,
+    viewerTimer: null,
+
+    load() {
+        try {
+            const raw = localStorage.getItem(this.storageKey);
+            const data = raw ? JSON.parse(raw) : { scripts: {} };
+            if (!data.scripts) data.scripts = {};
+            return data;
+        } catch (e) {
+            return { scripts: {} };
+        }
+    },
+
+    save(data) {
+        try { localStorage.setItem(this.storageKey, JSON.stringify(data)); } catch (e) {}
+    },
+
+    ensure(slug) {
+        const data = this.load();
+        if (!data.scripts[slug]) {
+            data.scripts[slug] = { views: 0, likes: 0, dislikes: 0, reaction: null };
+        }
+        return { data, stats: data.scripts[slug] };
+    },
+
+    registerView(slug) {
+        if (!slug) return;
+        const sessionFlag = `cihuyakz_viewed_${slug}`;
+        try {
+            if (sessionStorage.getItem(sessionFlag)) return;
+            sessionStorage.setItem(sessionFlag, '1');
+        } catch (e) {}
+        const { data, stats } = this.ensure(slug);
+        stats.views += 1;
+        this.save(data);
+    },
+
+    react(slug, reaction) {
+        if (!slug || !['like', 'dislike'].includes(reaction)) return;
+        const { data, stats } = this.ensure(slug);
+        const next = stats.reaction === reaction ? null : reaction;
+        if (stats.reaction === 'like') stats.likes = Math.max(0, stats.likes - 1);
+        if (stats.reaction === 'dislike') stats.dislikes = Math.max(0, stats.dislikes - 1);
+        if (next === 'like') stats.likes += 1;
+        if (next === 'dislike') stats.dislikes += 1;
+        stats.reaction = next;
+        this.save(data);
+        return stats;
+    },
+
+    get(slug) {
+        const { stats } = this.ensure(slug);
+        return { views: Number(stats.views) || 0, likes: Number(stats.likes) || 0, dislikes: Number(stats.dislikes) || 0, reaction: stats.reaction || null };
+    },
+
+    sessionId() {
+        try {
+            let id = sessionStorage.getItem(this.sessionKey);
+            if (!id) {
+                id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                sessionStorage.setItem(this.sessionKey, id);
+            }
+            return id;
+        } catch (e) {
+            return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+        }
+    },
+
+    updatePresence() {
+        const id = this.sessionId();
+        try {
+            const raw = localStorage.getItem(this.presenceKey);
+            const users = raw ? JSON.parse(raw) : {};
+            users[id] = Date.now();
+            const cutoff = Date.now() - 30000;
+            Object.keys(users).forEach(key => { if (Number(users[key]) < cutoff) delete users[key]; });
+            localStorage.setItem(this.presenceKey, JSON.stringify(users));
+            const count = Object.keys(users).length;
+            const el = document.getElementById('current-viewers');
+            if (el) el.textContent = String(count);
+            return count;
+        } catch (e) {
+            return 0;
+        }
+    },
+
+    startPresence() {
+        this.updatePresence();
+        clearInterval(this.presenceTimer);
+        this.presenceTimer = setInterval(() => this.updatePresence(), 10000);
+        window.addEventListener('storage', (event) => {
+            if (event.key === this.presenceKey || event.key === this.storageKey) {
+                this.updatePresence();
+                if (window.app && typeof window.app.renderList === 'function') window.app.renderList();
+            }
+        });
+    }
+};
+
 const app = {
     db: null,
     dbSha: null,
@@ -106,6 +203,7 @@ const app = {
     async init() {
         const sessionValid = await this.loadSession();
         await this.loadDatabase();
+        metrics.startPresence();
         this.handleRouting();
         window.addEventListener('hashchange', () => this.handleRouting());
         
@@ -232,13 +330,12 @@ const app = {
         }
     },
 
-    openSuggestionBoard() {
-        const board = document.getElementById('suggestion-board');
-        if (!board) return;
-        board.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        window.setTimeout(() => {
-            if (typeof window.loadSuggestionGiscus === 'function') window.loadSuggestionGiscus();
-        }, 250);
+    openManage() {
+        if (this.currentUser) {
+            navigate('admin');
+            return;
+        }
+        this.toggleLoginModal();
     },
 
     async login() {
@@ -650,11 +747,11 @@ const app = {
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-        
+
         const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
         const filtered = this.filterLogic(scripts);
         const sorted = this.sortLogic(filtered);
-        
+
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
                 <h2>No scripts found</h2>
@@ -662,9 +759,11 @@ const app = {
             </div>`;
             return;
         }
-        
+
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
+            const stats = metrics.get(scriptId);
+            const reaction = stats.reaction;
             return `<div class="script-card" onclick="window.location.href='scripts/${scriptId}/index.html'">
                 <div class="card-content">
                     <div class="card-header-section">
@@ -675,10 +774,22 @@ const app = {
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
+                        <span title="Views">👁 ${stats.views}</span>
+                    </div>
+                    <div class="script-reactions" onclick="event.stopPropagation()">
+                        <button class="reaction-btn ${reaction === 'like' ? 'active-like' : ''}" onclick="app.reactToScript('${scriptId}','like', this)" aria-label="Like ${utils.escapeHtml(s.title)}">👍 <span>${stats.likes}</span></button>
+                        <button class="reaction-btn ${reaction === 'dislike' ? 'active-dislike' : ''}" onclick="app.reactToScript('${scriptId}','dislike', this)" aria-label="Dislike ${utils.escapeHtml(s.title)}">👎 <span>${stats.dislikes}</span></button>
                     </div>
                 </div>
             </div>`;
         }).join('');
+    },
+
+    reactToScript(slug, reaction, button) {
+        const stats = metrics.react(slug, reaction);
+        if (!stats) return;
+        this.renderList();
+        this.showToast(reaction === 'like' ? 'Like updated' : 'Dislike updated', 'success');
     },
 
     filterLogic(scripts) {
@@ -772,6 +883,7 @@ const app = {
                     <div class="admin-meta">
                         <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
                         <span class="text-muted">Updated ${updated}</span>
+                        <span class="text-muted">👁 ${metrics.get(utils.sanitizeTitle(s.title)).views} · 👍 ${metrics.get(utils.sanitizeTitle(s.title)).likes} · 👎 ${metrics.get(utils.sanitizeTitle(s.title)).dislikes}</span>
                     </div>
                 </div>
                 <div class="admin-item-right">
@@ -1346,6 +1458,12 @@ const app = {
             </div>
         </div>
 
+        <div class="script-metrics" aria-live="polite">
+            <span class="metric-pill">👁 <span id="view-count">0</span> views</span>
+            <button class="reaction-btn" id="like-btn" type="button" onclick="react('like')">👍 <span id="like-count">0</span></button>
+            <button class="reaction-btn" id="dislike-btn" type="button" onclick="react('dislike')">👎 <span id="dislike-count">0</span></button>
+        </div>
+
         <div class="code-box">
             <div class="toolbar">
                 <div class="file-info">raw/${filename}</div>
@@ -1357,74 +1475,14 @@ const app = {
             </div>
             <pre><code id="code-display" class="language-lua">Loading...</code></pre>
         </div>
-
-        <div class="community-panel">
-            <div class="community-heading">
-                <div>
-                    <span class="section-kicker">SCRIPT COMMUNITY</span>
-                    <h2>Comments & Reactions</h2>
-                    <p>Gunakan 👍 Like atau 👎 Dislike di bagian reaction, lalu tulis komentar dan balas komentar lain.</p>
-                </div>
-                <button class="btn btn-danger-outline btn-sm" onclick="reportScript()">⚑ Report</button>
-            </div>
-            <div class="reaction-hint"><span>👍 Like</span><span>👎 Dislike</span><span>💬 Comment</span><span>↩ Reply</span></div>
-            <div class="giscus" id="giscus-comments"></div>
-        </div>
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
-    <script src="../../community-config.js"></script>
     <script>
         const filename = '${filename}';
         const scriptId = '${scriptId}';
         
-        function reportScript() {
-            const title = prompt('Jelaskan masalah/bug pada script ini:');
-            if (!title || !title.trim()) return;
-            const issueTitle = '[Report] ' + scriptId + ' - ' + title.trim();
-            const issueBody = 'Script: ' + scriptId + '\n\nDetail report:\n' + title.trim() + '\n\n---\nSent from CihuyAkz Studio Lite';
-            const url = 'https://github.com/CihuyAkz/CihuyAkz/issues/new?title=' + encodeURIComponent(issueTitle) + '&body=' + encodeURIComponent(issueBody) + '&labels=bug';
-            window.open(url, '_blank', 'noopener,noreferrer');
-        }
-
-        function loadGiscus() {
-            const base = window.CIHUYAKZ_COMMUNITY || {};
-            const cfg = {
-                repo: base.repo || 'CihuyAkz/CihuyAkz',
-                repoId: base.repoId || '',
-                category: base.category || 'General',
-                categoryId: base.categoryId || '',
-                mapping: 'pathname',
-                strict: '0',
-                reactionsEnabled: '1',
-                emitMetadata: '0',
-                inputPosition: 'top',
-                theme: base.theme || 'dark',
-                lang: base.lang || 'id'
-            };
-            if (!cfg.repoId || !cfg.categoryId) {
-                document.getElementById('giscus-comments').innerHTML = '<div class="community-setup"><strong>Comments belum terhubung.</strong><br>Isi Repo ID dan Category ID di <code>community-config.js</code>, lalu deploy ulang.</div>';
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = 'https://giscus.app/client.js';
-            script.dataset.repo = cfg.repo;
-            script.dataset.repoId = cfg.repoId;
-            script.dataset.category = cfg.category;
-            script.dataset.categoryId = cfg.categoryId;
-            script.dataset.mapping = cfg.mapping;
-            script.dataset.strict = cfg.strict;
-            script.dataset.reactionsEnabled = cfg.reactionsEnabled;
-            script.dataset.emitMetadata = cfg.emitMetadata;
-            script.dataset.inputPosition = cfg.inputPosition;
-            script.dataset.theme = cfg.theme;
-            script.dataset.lang = cfg.lang;
-            script.crossOrigin = 'anonymous';
-            script.async = true;
-            document.getElementById('giscus-comments').appendChild(script);
-        }
-
         async function loadScript() {
             try {
                 const res = await fetch(\`raw/\${filename}\`);
@@ -1455,8 +1513,64 @@ const app = {
             element.click();
             document.body.removeChild(element);
         }
+
+        const METRICS_KEY = 'cihuyakz_metrics_v1';
+        const PRESENCE_KEY = 'cihuyakz_presence_v1';
+        const SESSION_KEY = 'cihuyakz_viewed_' + scriptId;
+
+        function readMetrics() {
+            try {
+                const data = JSON.parse(localStorage.getItem(METRICS_KEY) || '{"scripts":{}}');
+                if (!data.scripts) data.scripts = {};
+                if (!data.scripts[scriptId]) data.scripts[scriptId] = { views: 0, likes: 0, dislikes: 0, reaction: null };
+                return data;
+            } catch (e) { return { scripts: { [scriptId]: { views: 0, likes: 0, dislikes: 0, reaction: null } } }; }
+        }
+        function writeMetrics(data) { try { localStorage.setItem(METRICS_KEY, JSON.stringify(data)); } catch (e) {} }
+        function paintMetrics() {
+            const data = readMetrics();
+            const stats = data.scripts[scriptId];
+            document.getElementById('view-count').textContent = stats.views;
+            document.getElementById('like-count').textContent = stats.likes;
+            document.getElementById('dislike-count').textContent = stats.dislikes;
+            document.getElementById('like-btn').classList.toggle('active-like', stats.reaction === 'like');
+            document.getElementById('dislike-btn').classList.toggle('active-dislike', stats.reaction === 'dislike');
+        }
+        function registerView() {
+            try { if (sessionStorage.getItem(SESSION_KEY)) return; sessionStorage.setItem(SESSION_KEY, '1'); } catch(e) {}
+            const data = readMetrics();
+            data.scripts[scriptId].views += 1;
+            writeMetrics(data);
+        }
+        function react(kind) {
+            const data = readMetrics();
+            const stats = data.scripts[scriptId];
+            const next = stats.reaction === kind ? null : kind;
+            if (stats.reaction === 'like') stats.likes = Math.max(0, stats.likes - 1);
+            if (stats.reaction === 'dislike') stats.dislikes = Math.max(0, stats.dislikes - 1);
+            if (next === 'like') stats.likes += 1;
+            if (next === 'dislike') stats.dislikes += 1;
+            stats.reaction = next;
+            writeMetrics(data);
+            paintMetrics();
+        }
+        function updatePresence() {
+            try {
+                const id = sessionStorage.getItem('cihuyakz_session_id_v1') || (Date.now() + '-' + Math.random().toString(36).slice(2));
+                sessionStorage.setItem('cihuyakz_session_id_v1', id);
+                const users = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
+                users[id] = Date.now();
+                const cutoff = Date.now() - 30000;
+                Object.keys(users).forEach(k => { if (Number(users[k]) < cutoff) delete users[k]; });
+                localStorage.setItem(PRESENCE_KEY, JSON.stringify(users));
+            } catch(e) {}
+        }
+        registerView();
+        paintMetrics();
+        updatePresence();
+        setInterval(updatePresence, 10000);
+        window.addEventListener('storage', paintMetrics);
         
-        loadGiscus();
         loadScript();
     </script>
 </body>

@@ -9,7 +9,12 @@
       "filename": "example-script.lua",
       "size": 259,
       "created": "2026-09-24T00:00:00.000Z",
-      "updated": "2026-09-24T00:00:00.000Z"
+      "updated": "2026-09-24T00:00:00.000Z",
+      "stats": {
+        "views": 0,
+        "likes": 0,
+        "dislikes": 0
+      }
     }
   },
   "bots": {}

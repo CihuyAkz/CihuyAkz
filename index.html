@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-community-v2">
+    <link rel="stylesheet" href="style.css?v=20260925-red-v3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -36,14 +36,11 @@
             </div>
 
             <div class="nav-right">
-                <div class="nav-actions">
-                    <div id="auth-section">
-                        <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Manage</button>
-                    </div>
-                    <div id="user-section" style="display:none">
-                        <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
-                    </div>
-                    <button id="suggestion-nav-button" class="btn btn-secondary btn-sm" onclick="app.openSuggestionBoard()"><span class="suggestion-full-label">Suggestion</span><span class="suggestion-short-label">Suggest</span></button>
+                <div id="auth-section">
+                    <button class="btn btn-secondary btn-sm" onclick="app.openManage()">Manage</button>
+                </div>
+                <div id="user-section" style="display:none">
+                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
                 </div>
             </div>
         </div>
@@ -52,7 +49,7 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Manage Access — CihuyAkz</h3>
+                <h3>Manage CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
@@ -65,7 +62,6 @@
             </div>
         </div>
     </div>
-
 
     <div class="container">
         <div id="view-home" class="view-section animate__animated animate__fadeIn" style="display:block">
@@ -118,24 +114,13 @@
                 </aside>
                 
                 <main class="main-content">
+                    <div class="live-viewers-bar" aria-live="polite">👁 <strong id="current-viewers">0</strong> Current View</div>
                     <div class="script-grid" id="script-list">
                         <div style="text-align:center;padding:60px 0;grid-column:1/-1">
                             <div class="spinner"></div>
                             <p>Loading library...</p>
                         </div>
                     </div>
-
-                    <section id="suggestion-board" class="suggestion-board" aria-labelledby="suggestion-title-heading">
-                        <div class="suggestion-board-head">
-                            <div>
-                                <span class="section-kicker">COMMUNITY</span>
-                                <h2 id="suggestion-title-heading">Suggestion Board</h2>
-                                <p>Tulis saran langsung di website. Saran, reply, dan reaction tersimpan di GitHub Discussions, bukan GitHub Issues.</p>
-                            </div>
-                            <a class="btn btn-secondary btn-sm" href="https://github.com/CihuyAkz/CihuyAkz/discussions" target="_blank" rel="noopener noreferrer">Open Discussions</a>
-                        </div>
-                        <div id="giscus-suggestions" class="giscus suggestion-giscus"></div>
-                    </section>
                 </main>
             </div>
         </div>
@@ -300,40 +285,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script>
-        (function () {
-            let suggestionLoaded = false;
-            window.loadSuggestionGiscus = function () {
-                if (suggestionLoaded) return;
-                const host = document.getElementById('giscus-suggestions');
-                const cfg = window.CIHUYAKZ_COMMUNITY || {};
-                if (!host || !cfg.repoId || !cfg.categoryId) {
-                    if (host) {
-                        host.innerHTML = '<div class="community-setup"><strong>Suggestion Board belum terhubung.</strong><br>Isi Repo ID dan Category ID di <code>community-config.js</code>.</div>';
-                    }
-                    return;
-                }
-                suggestionLoaded = true;
-                const script = document.createElement('script');
-                script.src = 'https://giscus.app/client.js';
-                script.dataset.repo = cfg.repo || 'CihuyAkz/CihuyAkz';
-                script.dataset.repoId = cfg.repoId;
-                script.dataset.category = cfg.suggestionCategory || 'Ideas';
-                script.dataset.categoryId = cfg.suggestionCategoryId || cfg.categoryId;
-                script.dataset.mapping = 'specific';
-                script.dataset.term = cfg.suggestionTerm || 'CihuyAkz Suggestions';
-                script.dataset.strict = '0';
-                script.dataset.reactionsEnabled = '1';
-                script.dataset.emitMetadata = '0';
-                script.dataset.inputPosition = 'top';
-                script.dataset.theme = cfg.theme || 'dark';
-                script.dataset.lang = cfg.lang || 'id';
-                script.crossOrigin = 'anonymous';
-                script.async = true;
-                host.appendChild(script);
-            };
-        })();
-    </script>
-    <script src="app.js?v=20260925-community-v2"></script>
+    <script src="app.js?v=20260925-red-metrics-v1"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>

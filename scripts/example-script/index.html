@@ -34,6 +34,12 @@
             </div>
         </div>
 
+        <div class="script-metrics" aria-live="polite">
+            <span class="metric-pill">👁 <span id="view-count">0</span> views</span>
+            <button class="reaction-btn" id="like-btn" type="button" onclick="react('like')">👍 <span id="like-count">0</span></button>
+            <button class="reaction-btn" id="dislike-btn" type="button" onclick="react('dislike')">👎 <span id="dislike-count">0</span></button>
+        </div>
+
         <div class="code-box">
             <div class="toolbar">
                 <div class="file-info">raw/example-script.lua</div>
@@ -80,6 +86,64 @@
             element.click();
             document.body.removeChild(element);
         }
+
+
+        const METRICS_KEY = 'cihuyakz_metrics_v1';
+        const PRESENCE_KEY = 'cihuyakz_presence_v1';
+        const SESSION_KEY = `cihuyakz_viewed_${scriptId}`;
+
+        function readMetrics() {
+            try {
+                const data = JSON.parse(localStorage.getItem(METRICS_KEY) || '{"scripts":{}}');
+                if (!data.scripts) data.scripts = {};
+                if (!data.scripts[scriptId]) data.scripts[scriptId] = { views: 0, likes: 0, dislikes: 0, reaction: null };
+                return data;
+            } catch (e) { return { scripts: { [scriptId]: { views: 0, likes: 0, dislikes: 0, reaction: null } } }; }
+        }
+        function writeMetrics(data) { try { localStorage.setItem(METRICS_KEY, JSON.stringify(data)); } catch (e) {} }
+        function paintMetrics() {
+            const data = readMetrics();
+            const stats = data.scripts[scriptId];
+            document.getElementById('view-count').textContent = stats.views;
+            document.getElementById('like-count').textContent = stats.likes;
+            document.getElementById('dislike-count').textContent = stats.dislikes;
+            document.getElementById('like-btn').classList.toggle('active-like', stats.reaction === 'like');
+            document.getElementById('dislike-btn').classList.toggle('active-dislike', stats.reaction === 'dislike');
+        }
+        function registerView() {
+            try { if (sessionStorage.getItem(SESSION_KEY)) return; sessionStorage.setItem(SESSION_KEY, '1'); } catch(e) {}
+            const data = readMetrics();
+            data.scripts[scriptId].views += 1;
+            writeMetrics(data);
+        }
+        function react(kind) {
+            const data = readMetrics();
+            const stats = data.scripts[scriptId];
+            const next = stats.reaction === kind ? null : kind;
+            if (stats.reaction === 'like') stats.likes = Math.max(0, stats.likes - 1);
+            if (stats.reaction === 'dislike') stats.dislikes = Math.max(0, stats.dislikes - 1);
+            if (next === 'like') stats.likes += 1;
+            if (next === 'dislike') stats.dislikes += 1;
+            stats.reaction = next;
+            writeMetrics(data);
+            paintMetrics();
+        }
+        function updatePresence() {
+            try {
+                const id = sessionStorage.getItem('cihuyakz_session_id_v1') || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+                sessionStorage.setItem('cihuyakz_session_id_v1', id);
+                const users = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
+                users[id] = Date.now();
+                const cutoff = Date.now() - 30000;
+                Object.keys(users).forEach(k => { if (Number(users[k]) < cutoff) delete users[k]; });
+                localStorage.setItem(PRESENCE_KEY, JSON.stringify(users));
+            } catch(e) {}
+        }
+        registerView();
+        paintMetrics();
+        updatePresence();
+        setInterval(updatePresence, 10000);
+        window.addEventListener('storage', paintMetrics);
 
         loadScript();
     </script>
