@@ -339,50 +339,47 @@ const app = {
             if (list) {
                 list.innerHTML = `<div style="text-align:center;padding:20px"><div class="spinner"></div><p>Loading...</p></div>`;
             }
-            
-            const url = `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json?t=${CONFIG.cacheBuster()}`;
-            const headers = this.token ? { 'Authorization': `token ${this.token}` } : {};
-            
-            const res = await fetch(url, { headers });
-            
-            if (res.status === 404) {
-                this.db = { scripts: {}, bots: {} };
-                this.dbSha = null;
-                this.renderList();
-                if (list) list.innerHTML = `<div class="empty-admin-state"><p>No scripts yet</p></div>`;
-                return;
-            }
-            
-            if (!res.ok) throw new Error(`Failed to load database: ${res.status}`);
-            
-            const file = await res.json();
-            this.dbSha = file.sha;
-            
-            try {
-                const content = utils.safeAtob(file.content);
-                this.db = JSON.parse(content);
+
+            // Public/library view is intentionally local-first. The original project
+            // fetched the old GitHub database on every page load, which made deleted
+            // scripts reappear even though the bundled database was cleaned.
+            const localSaved = localStorage.getItem('cihuyakz_local_db');
+            if (localSaved) {
+                this.db = JSON.parse(localSaved);
                 if (!this.db.scripts) this.db.scripts = {};
                 if (!this.db.bots) this.db.bots = {};
-
-                Object.keys(this.scheduledTimers).forEach(id => clearTimeout(this.scheduledTimers[id]));
-                this.scheduledTimers = {};
-
-                Object.entries(this.db.bots).forEach(([botId, bot]) => {
-                    if (bot.scheduled && bot.scheduledTime && !bot.sent && !bot.cancelled) {
-                        this.scheduleBotTimer(botId, bot);
-                    }
-                });
-                
-            } catch(parseError) {
-                console.error('Database parse error:', parseError);
-                this.db = { scripts: {}, bots: {} };
+                this.renderList();
+                this.renderAdminList();
+                return;
             }
-            
+
+            const localRes = await fetch(`database.json?t=${CONFIG.cacheBuster()}`, {
+                cache: 'no-store',
+                headers: { 'Cache-Control': 'no-cache' }
+            });
+            if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
+
+            this.db = await localRes.json();
+            if (!this.db.scripts) this.db.scripts = {};
+            if (!this.db.bots) this.db.bots = {};
+            try {
+                localStorage.setItem('cihuyakz_local_db', JSON.stringify(this.db));
+            } catch (storageError) {
+                console.warn('Local database cache unavailable:', storageError);
+            }
+
+            Object.keys(this.scheduledTimers).forEach(id => clearTimeout(this.scheduledTimers[id]));
+            this.scheduledTimers = {};
+            Object.entries(this.db.bots).forEach(([botId, bot]) => {
+                if (bot.scheduled && bot.scheduledTime && !bot.sent && !bot.cancelled) {
+                    this.scheduleBotTimer(botId, bot);
+                }
+            });
+
             this.renderList();
             this.renderAdminList();
-            
         } catch (e) {
-            console.error("DB Error", e);
+            console.error('DB Error', e);
             const list = document.getElementById('admin-list');
             if (list) {
                 list.innerHTML = `<div class="empty-admin-state">
@@ -1157,6 +1154,16 @@ const app = {
         this.toggleScheduleFields();
     },
 
+    async getRemoteDatabaseSha() {
+        const url = `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json?t=${CONFIG.cacheBuster()}`;
+        const res = await fetch(url, {
+            headers: { 'Authorization': `token ${this.token}` }
+        });
+        if (!res.ok) throw new Error(`Failed to access remote database: ${res.status}`);
+        const file = await res.json();
+        return file.sha;
+    },
+
     async saveScript() {
         if (!this.currentUser || !this.db) {
             this.showToast('Please login first.', 'error');
@@ -1220,6 +1227,14 @@ const app = {
             
             await this.createScriptFiles(newScriptId, filename, code, isEditing, this.originalScriptId);
             this.db.scripts[title] = scriptData;
+            if (!this.db.bots) this.db.bots = {};
+            if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
+
+            try {
+                localStorage.setItem('cihuyakz_local_db', JSON.stringify(this.db));
+            } catch (storageError) {
+                console.warn('Could not persist local database cache:', storageError);
+            }
             
             const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
@@ -1247,7 +1262,8 @@ const app = {
             
             document.getElementById('editor-heading').textContent = `Edit: ${title}`;
             saveBtn.textContent = 'Update Script';
-            await this.loadDatabase();
+            this.renderList();
+            this.renderAdminList();
             
         } catch(e) {
             this.showToast(`Error: ${e.message}`, 'error');

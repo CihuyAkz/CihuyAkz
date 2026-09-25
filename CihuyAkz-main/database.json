@@ -4,7 +4,7 @@
       "title": "Example Script",
       "displayTitle": "Example Script",
       "visibility": "PUBLIC",
-      "description": "Starter example — edit, replace, or delete this script from the Manage > Add New area.",
+      "description": "Starter template. Edit this script or delete it, then use Manage → Add New to create your own script.",
       "expiration": null,
       "filename": "example-script.lua",
       "size": 259,
