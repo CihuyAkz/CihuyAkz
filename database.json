@@ -29,6 +29,45 @@
         }
       },
       "filename": "index.html"
+    },
+    "advanced-r6-animation": {
+      "id": "advanced-r6-animation",
+      "title": "Advanced R6 Animation",
+      "displayTitle": "Advanced R6 Animation",
+      "visibility": "PUBLIC",
+      "description": "Mengubah Animasi R6 Agar terlihat lebih Bagus(Modified)",
+      "created": "2026-09-25T13:35:56.596Z",
+      "updated": "2026-09-25T13:35:56.596Z",
+      "scripts": {
+        "local-script": {
+          "id": "local-script",
+          "name": "Local Script",
+          "displayName": "Local Script",
+          "filename": "local-script.lua",
+          "size": 23939,
+          "created": "2026-09-25T13:35:56.596Z",
+          "updated": "2026-09-25T13:35:56.596Z"
+        },
+        "server-script": {
+          "id": "server-script",
+          "name": "Server Script",
+          "displayName": "Server Script",
+          "filename": "server-script.lua",
+          "size": 2888,
+          "created": "2026-09-25T13:35:56.596Z",
+          "updated": "2026-09-25T13:35:56.596Z"
+        },
+        "animasi-id-yang-ada-di-video": {
+          "id": "animasi-id-yang-ada-di-video",
+          "name": "Animasi Id Yang ada di Video",
+          "displayName": "Animasi Id Yang ada di Video",
+          "filename": "animasi-id-yang-ada-di-video.lua",
+          "size": 14,
+          "created": "2026-09-25T13:35:56.596Z",
+          "updated": "2026-09-25T13:35:56.596Z"
+        }
+      },
+      "filename": "index.html"
     }
   },
   "bots": {}
