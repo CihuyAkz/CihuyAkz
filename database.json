@@ -1,6 +1,26 @@
 {
   "scripts": {},
   "bots": {},
-  "pages": {},
+  "pages": {
+    "Aku Bot kata cihuy": {
+      "id": "aku-bot-kata-cihuy",
+      "title": "Aku Bot kata cihuy",
+      "displayTitle": "Aku Bot kata cihuy",
+      "visibility": "PUBLIC",
+      "description": "",
+      "scripts": [
+        {
+          "id": "ida",
+          "name": "Ida",
+          "filename": "ida.lua",
+          "size": 5,
+          "created": "2026-09-25T12:31:47.203Z",
+          "updated": "2026-09-25T12:31:47.203Z"
+        }
+      ],
+      "created": "2026-09-25T12:31:47.203Z",
+      "updated": "2026-09-25T12:31:47.203Z"
+    }
+  },
   "luaSnippets": {}
 }
