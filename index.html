@@ -36,12 +36,14 @@
             </div>
 
             <div class="nav-right">
-                <button class="btn btn-secondary btn-sm suggestion-nav-btn" onclick="app.toggleSuggestionModal()">💡 Suggestion</button>
-                <div id="auth-section">
-                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Login</button>
-                </div>
-                <div id="user-section" style="display:none">
-                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
+                <div class="nav-actions">
+                    <div id="auth-section">
+                        <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Manage</button>
+                    </div>
+                    <div id="user-section" style="display:none">
+                        <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
+                    </div>
+                    <button class="btn btn-secondary btn-sm" onclick="app.toggleSuggestionModal()">Suggestion</button>
                 </div>
             </div>
         </div>
@@ -50,7 +52,7 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Login CihuyAkz</h3>
+                <h3>Manage Access — CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
@@ -59,50 +61,34 @@
                     <input type="password" id="auth-token" class="input-field" placeholder="ghp_..." autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
                 </div>
                 <div id="login-error" role="alert" aria-live="polite" style="color:var(--color-danger);font-size:13px;margin:16px 0;text-align:center;display:none"></div>
-                <button class="btn btn-full" onclick="app.login()">Login</button>
+                <button class="btn btn-full" onclick="app.login()">Manage</button>
             </div>
         </div>
     </div>
 
     <div id="suggestion-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleSuggestionModal()">
-        <div class="modal suggestion-modal animate__animated animate__zoomIn">
+        <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <div>
-                    <span class="community-kicker">COMMUNITY</span>
-                    <h3>Suggestion</h3>
-                </div>
+                <h3>Send Suggestion</h3>
                 <button class="close-btn" onclick="app.toggleSuggestionModal()">×</button>
             </div>
             <div class="modal-body">
-                <p class="modal-help">Kirim ide, fitur baru, atau masukan untuk CihuyAkz Studio Lite.</p>
                 <div class="form-group">
-                    <label>Judul</label>
-                    <input id="suggestion-title" class="input-field" maxlength="100" placeholder="Contoh: Tambah tema baru">
+                    <label>Suggestion Title</label>
+                    <input type="text" id="suggestion-title" class="input-field" placeholder="Contoh: Tambah kategori script">
                 </div>
                 <div class="form-group">
-                    <label>Saran</label>
-                    <textarea id="suggestion-body" class="input-field" rows="6" maxlength="3000" placeholder="Tulis detail saran kamu..."></textarea>
+                    <label>Suggestion</label>
+                    <textarea id="suggestion-body" class="input-field" rows="6" placeholder="Jelaskan saranmu..."></textarea>
                 </div>
-                <div class="form-group">
-                    <label>Nama / Username (opsional)</label>
-                    <input id="suggestion-author" class="input-field" maxlength="60" placeholder="CihuyAkz">
-                </div>
-                <button class="btn btn-full" onclick="app.submitSuggestion()">Kirim Suggestion</button>
-                <p class="modal-note">Pengiriman akan dibuka melalui GitHub Issues agar saran bisa tercatat di repository.</p>
+                <p class="helper-text">Suggestion akan dibuka sebagai GitHub Issue agar bisa dikelola oleh pemilik website.</p>
+                <button class="btn btn-full" onclick="app.submitSuggestion()">Send Suggestion</button>
             </div>
         </div>
     </div>
 
     <div class="container">
         <div id="view-home" class="view-section animate__animated animate__fadeIn" style="display:block">
-            <div class="home-community-bar">
-                <div>
-                    <span class="community-kicker">CIHUYAKZ STUDIO LITE</span>
-                    <h1>Script Library & Community</h1>
-                    <p>Bagikan script, beri reaction, kirim komentar, atau laporkan bug dari halaman script.</p>
-                </div>
-                <button class="btn" onclick="app.toggleSuggestionModal()">💡 Kirim Suggestion</button>
-            </div>
             <div class="content-wrapper">
                 <aside class="sidebar">
                     <div class="sidebar-section">
@@ -322,6 +308,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260924-red"></script>
+    <script src="app.js?v=20260925-community-v1"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>

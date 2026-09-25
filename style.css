@@ -1012,139 +1012,15 @@ body {
     border-top-color: #ff4b4b !important;
 }
 
-
-/* ===== Community / Engagement UI ===== */
-.home-community-bar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 24px;
-    margin-bottom: 28px;
-    padding: 24px 26px;
-    border-radius: 16px;
-    background: linear-gradient(120deg, rgba(91, 7, 20, 0.90), rgba(29, 3, 9, 0.94));
-    border: 1px solid rgba(255, 88, 88, 0.24);
-    box-shadow: 0 18px 42px rgba(92, 0, 18, 0.20);
-}
-
-.home-community-bar h1 {
-    font-size: 26px;
-    line-height: 1.2;
-    margin: 4px 0 6px;
-}
-
-.home-community-bar p,
-.script-community-note,
-.modal-help,
-.modal-note {
-    color: var(--color-text-muted);
-    font-size: 13px;
-}
-
-.community-kicker {
-    display: inline-block;
-    color: #ff8b8b;
-    font-size: 10px;
-    font-weight: 800;
-    letter-spacing: 1px;
-}
-
-.suggestion-modal { max-width: 520px; }
-.suggestion-nav-btn { white-space: nowrap; }
-
-.engagement-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-}
-
-.card-engagement {
-    margin-top: 14px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(255,255,255,0.06);
-}
-
-.script-engagement {
-    justify-content: flex-end;
-}
-
-.reaction-btn {
-    border: 1px solid rgba(255, 84, 84, 0.20);
-    background: rgba(30, 4, 9, 0.72);
-    color: #fff;
-    border-radius: 999px;
-    padding: 8px 12px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 12px;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    transition: 0.2s;
-}
-
-.reaction-btn:hover {
-    border-color: rgba(255, 104, 104, 0.50);
-    transform: translateY(-1px);
-}
-
-.reaction-btn.is-active {
-    background: linear-gradient(135deg, rgba(255, 76, 76, 0.30), rgba(145, 13, 47, 0.32));
-    border-color: rgba(255, 110, 110, 0.65);
-    box-shadow: 0 0 18px rgba(255, 59, 59, 0.12);
-}
-
-.community-label {
-    color: var(--color-text-muted);
-    font-size: 11px;
-    margin-left: auto;
-}
-
-.script-community-note {
-    margin: -10px 0 18px;
-}
-
-.community-panel {
-    margin-top: 28px;
-    padding: 24px;
-    border-radius: 16px;
-    background: linear-gradient(145deg, rgba(38, 5, 12, 0.92), rgba(17, 3, 7, 0.96));
-    border: 1px solid rgba(255, 84, 84, 0.18);
-}
-
-.community-panel-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 16px;
-    margin-bottom: 18px;
-}
-
-.community-panel-header h2 {
-    margin-top: 4px;
-    font-size: 20px;
-}
-
-.comment-form {
-    display: grid;
-    gap: 12px;
-}
-
-.comment-actions {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-}
-
-@media (max-width: 768px) {
-    .suggestion-nav-btn { display: none; }
-    .home-community-bar,
-    .community-panel-header,
-    .comment-actions { flex-direction: column; align-items: stretch; }
-    .home-community-bar .btn,
-    .comment-actions .btn { width: 100%; }
-    .script-engagement { justify-content: flex-start; margin-top: 4px; }
-    .community-label { margin-left: 0; width: 100%; }
-}
+.nav-actions { display:flex; align-items:center; gap:10px; }
+.helper-text { color:var(--color-text-muted); font-size:12px; margin: -4px 0 16px; }
+.btn-danger-outline { background:transparent; color:#ff8b8b; border:1px solid rgba(255,80,80,.45); }
+.btn-danger-outline:hover { background:rgba(255,50,50,.12); border-color:#ff4d4d; }
+.community-panel { margin-top:28px; padding:24px; border:1px solid var(--color-border); border-radius:16px; background:linear-gradient(145deg, rgba(38,7,11,.92), rgba(14,4,6,.96)); box-shadow:var(--shadow-md); }
+.community-heading { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; margin-bottom:10px; }
+.community-heading h2 { font-size:20px; margin-bottom:3px; }
+.community-heading p { color:var(--color-text-muted); font-size:13px; }
+.reaction-hint { display:inline-block; padding:8px 12px; border-radius:999px; background:rgba(255,59,59,.08); color:#ffc1c1; font-size:12px; margin-bottom:16px; }
+.community-setup { padding:18px; border:1px dashed var(--color-border); border-radius:12px; color:var(--color-text-muted); font-size:13px; line-height:1.7; }
+.giscus, .giscus-frame { width:100%; }
+@media (max-width: 760px) { .nav-actions { gap:6px; } .community-heading { flex-direction:column; } .community-panel { padding:16px; } }

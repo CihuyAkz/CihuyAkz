@@ -1,37 +1,87 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Example Script - CihuyAkz Studio Lite</title>
-<link rel="icon" type="image/png" href="../../assets/cihuyakz-icon.png">
-<link rel="stylesheet" href="../../style.css?v=20260925-community-v1">
-<link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Example Script - CihuyAkz Studio Lite</title>
+    <link rel="icon" type="image/svg+xml" href="../../assets/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="../../style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-<nav class="navbar"><div class="nav-content"><div class="nav-left"><a href="../../index.html" class="brand" style="text-decoration:none;color:inherit"><img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="CihuyAkz Studio Lite"><span class="nav-title">CihuyAkz Studio Lite</span></a></div><div class="nav-right"><a href="../../index.html" class="btn btn-secondary btn-sm">Back</a></div></div></nav>
-<div class="container">
-<div class="script-header-lg"><div><h1>Example Script</h1><div class="meta-row"><span class="meta-badge">Starter Template</span></div></div><div class="engagement-row script-engagement" data-engagement-id="example-script"><button class="reaction-btn like-btn" data-reaction="like" onclick="reactToScript('like',event)">👍 <span data-count="likes">0</span></button><button class="reaction-btn dislike-btn" data-reaction="dislike" onclick="reactToScript('dislike',event)">👎 <span data-count="dislikes">0</span></button></div></div>
-<p class="script-community-note">Komentar, laporan bug, dan feedback dikirim melalui GitHub Issues supaya tersimpan rapi di repository.</p>
-<div class="code-box"><div class="toolbar"><div class="file-info">raw/example-script.lua</div><div class="toolbar-right"><button class="btn btn-sm" onclick="downloadScript()">Download</button><button class="btn btn-sm" onclick="copyScript(this)">Copy</button><a href="raw/example-script.lua" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-display" class="language-lua">Loading...</code></pre></div>
-<section class="community-panel"><div class="community-panel-header"><div><span class="community-kicker">COMMUNITY</span><h2>Komentar & Laporan</h2></div><button class="btn btn-secondary btn-sm" onclick="openReportModal()">🚩 Report</button></div><div class="comment-form"><input id="comment-author" class="input-field" maxlength="60" placeholder="Nama / username (opsional)"><textarea id="comment-body" class="input-field" rows="5" maxlength="3000" placeholder="Tulis komentar tentang script ini..."></textarea><div class="comment-actions"><span class="modal-note">Komentar akan dibuka sebagai GitHub Issue baru.</span><button class="btn" onclick="sendComment()">Kirim Komentar</button></div></div></section>
-<div id="report-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeReportModal()"><div class="modal"><div class="modal-header"><div><span class="community-kicker">REPORT</span><h3>Laporkan Script</h3></div><button class="close-btn" onclick="closeReportModal()">×</button></div><div class="form-group"><label>Kategori</label><select id="report-type" class="input-field"><option value="Bug">Bug / Error</option><option value="Broken Link">Link rusak</option><option value="Inappropriate">Konten tidak sesuai</option><option value="Other">Lainnya</option></select></div><div class="form-group"><label>Detail</label><textarea id="report-body" class="input-field" rows="6" maxlength="3000" placeholder="Jelaskan masalahnya..."></textarea></div><div class="form-group"><label>Nama / Username (opsional)</label><input id="report-author" class="input-field" maxlength="60" placeholder="Anonymous"></div><button class="btn btn-full" onclick="sendReport()">Kirim Report</button></div></div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script><script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
-<script>
-const scriptId='example-script', scriptTitle='Example Script', filename='example-script.lua', engagementKey='cihuyakz_engagement_v1', repoOwner='simplyIeaf', repoName='simplyIeaf.github.io';
-function getStore(){try{return JSON.parse(localStorage.getItem(engagementKey)||'{}')||{}}catch(e){return {}}}
-function getE(){const d=getStore()[scriptId]||{};return {likes:Number(d.likes||0),dislikes:Number(d.dislikes||0),reaction:d.reaction||null}}
-function saveE(e){const s=getStore();s[scriptId]=e;try{localStorage.setItem(engagementKey,JSON.stringify(s))}catch(e){}}
-function refresh(){const e=getE(),g=document.querySelector('[data-engagement-id="'+scriptId+'"]');if(!g)return;g.querySelector('[data-count="likes"]').textContent=e.likes;g.querySelector('[data-count="dislikes"]').textContent=e.dislikes;g.querySelector('[data-reaction="like"]').classList.toggle('is-active',e.reaction==='like');g.querySelector('[data-reaction="dislike"]').classList.toggle('is-active',e.reaction==='dislike')}
-function reactToScript(t,event){if(event){event.preventDefault();event.stopPropagation()}const e=getE();if(e.reaction===t){e[t==='like'?'likes':'dislikes']=Math.max(0,e[t==='like'?'likes':'dislikes']-1);e.reaction=null}else{if(e.reaction==='like')e.likes=Math.max(0,e.likes-1);if(e.reaction==='dislike')e.dislikes=Math.max(0,e.dislikes-1);e[t==='like'?'likes':'dislikes']+=1;e.reaction=t}saveE(e);refresh()}
-function issue(type,title,body){const b=body+'\n\n---\nSubmitted from CihuyAkz Studio Lite\nScript: '+scriptTitle+'\nURL: '+location.href;return 'https://github.com/'+repoOwner+'/'+repoName+'/issues/new?title='+encodeURIComponent('['+type+'] '+title)+'&body='+encodeURIComponent(b)}
-function sendComment(){const a=(document.getElementById('comment-author').value||'').trim(),b=(document.getElementById('comment-body').value||'').trim();if(!b)return alert('Komentar tidak boleh kosong.');window.open(issue('Comment',scriptTitle,'**Comment**\n\n'+b+'\n\n**Author:** '+(a||'Anonymous')),'_blank','noopener,noreferrer')}
-function openReportModal(){document.getElementById('report-modal').style.display='flex'} function closeReportModal(){document.getElementById('report-modal').style.display='none'}
-function sendReport(){const t=document.getElementById('report-type').value,b=(document.getElementById('report-body').value||'').trim(),a=(document.getElementById('report-author').value||'').trim();if(!b)return alert('Detail report tidak boleh kosong.');window.open(issue(t,scriptTitle,'**Report**\n\n'+b+'\n\n**Author:** '+(a||'Anonymous')),'_blank','noopener,noreferrer');closeReportModal()}
-async function load(){try{const r=await fetch('raw/'+filename+'?v='+Date.now(),{cache:'no-store'});document.getElementById('code-display').textContent=await r.text();Prism.highlightAll()}catch(e){document.getElementById('code-display').textContent='-- Error loading source'}refresh()}
-function copyScript(btn){navigator.clipboard.writeText(document.getElementById('code-display').textContent).then(()=>{const o=btn.textContent;btn.textContent='Copied!';setTimeout(()=>btn.textContent=o,2000)})}
-function downloadScript(){const e=document.createElement('a');e.href='data:text/plain;charset=utf-8,'+encodeURIComponent(document.getElementById('code-display').textContent);e.download=filename;document.body.appendChild(e);e.click();e.remove()}
-load();
-</script>
-</body></html>
+    <nav class="navbar">
+        <div class="nav-content">
+            <div class="nav-left">
+                <a href="../../index.html" class="brand" style="text-decoration:none;color:inherit">
+                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="CihuyAkz Studio Lite">
+                    <span class="nav-title">CihuyAkz Studio Lite</span>
+                </a>
+            </div>
+            <div class="nav-right">
+                <a href="../../index.html" class="btn btn-secondary btn-sm">Back</a>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="script-header-lg">
+            <div>
+                <h1>Example Script</h1>
+                <div class="meta-row">
+                    <span class="meta-badge">Starter example</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="code-box">
+            <div class="toolbar">
+                <div class="file-info">raw/example-script.lua</div>
+                <div class="toolbar-right">
+                    <button class="btn btn-sm" onclick="downloadScript()">Download</button>
+                    <button class="btn btn-sm" onclick="copyScript(this)">Copy</button>
+                    <a href="raw/example-script.lua" class="btn btn-secondary btn-sm" target="_blank">Raw</a>
+                </div>
+            </div>
+            <pre><code id="code-display" class="language-lua">Loading...</code></pre>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+    <script>
+        async function loadScript() {
+            try {
+                const res = await fetch('raw/example-script.lua');
+                const code = await res.text();
+                document.getElementById('code-display').textContent = code;
+                Prism.highlightAll();
+            } catch (e) {
+                document.getElementById('code-display').textContent = '-- Error loading source';
+            }
+        }
+
+        function copyScript(btn) {
+            const code = document.getElementById('code-display').textContent;
+            navigator.clipboard.writeText(code).then(() => {
+                const original = btn.innerText;
+                btn.innerText = 'Copied!';
+                setTimeout(() => btn.innerText = original, 2000);
+            });
+        }
+
+        function downloadScript() {
+            const code = document.getElementById('code-display').textContent;
+            const element = document.createElement('a');
+            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(code);
+            element.download = 'example-script.lua';
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        loadScript();
+    </script>
+</body>
+</html>

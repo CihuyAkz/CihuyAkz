@@ -1,6 +1,10 @@
--- CihuyAkz Studio Lite Example Script
--- Edit this from Manage -> Add New / Edit.
+-- CihuyAkz Studio Lite
+-- Example Script: starter code you can edit or replace.
 
-print("Hello from CihuyAkz Studio Lite!")
+local Players = game:GetService("Players")
 
--- Add your Lua code below.
+local function onPlayerAdded(player)
+    print(("Welcome, %s!"):format(player.Name))
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
