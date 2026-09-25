@@ -4,7 +4,9 @@ const CONFIG = {
     repo: 'simplyIeaf.github.io',
     allowedUser: 'CihuyAkz',
     branch: 'main',
-    cacheBuster: () => Date.now()
+    cacheBuster: () => Date.now(),
+    dbCacheKey: 'cihuyakz_local_db_v4',
+    engagementKey: 'cihuyakz_engagement_v1'
 };
 
 const utils = {
@@ -96,6 +98,10 @@ const app = {
     scheduledTimers: {},
     
     async init() {
+        try {
+            localStorage.removeItem('cihuyakz_local_db_v2');
+            localStorage.removeItem('cihuyakz_local_db_v3');
+        } catch (e) {}
         const sessionValid = await this.loadSession();
         await this.loadDatabase();
         this.handleRouting();
@@ -345,7 +351,7 @@ const app = {
             // Public/library view is intentionally local-first. The original project
             // fetched the old GitHub database on every page load, which made deleted
             // scripts reappear even though the bundled database was cleaned.
-            const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
+            const localSaved = localStorage.getItem(CONFIG.dbCacheKey);
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
                 if (!this.db.scripts) this.db.scripts = {};
@@ -365,7 +371,7 @@ const app = {
             if (!this.db.scripts) this.db.scripts = {};
             if (!this.db.bots) this.db.bots = {};
             try {
-                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+                localStorage.setItem(CONFIG.dbCacheKey, JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Local database cache unavailable:', storageError);
             }
@@ -630,14 +636,117 @@ const app = {
         }
     },
 
+    toggleSuggestionModal() {
+        const modal = document.getElementById('suggestion-modal');
+        if (!modal) return;
+        const opening = modal.style.display !== 'flex';
+        modal.style.display = opening ? 'flex' : 'none';
+        if (opening) {
+            const title = document.getElementById('suggestion-title');
+            if (title) setTimeout(() => title.focus(), 50);
+        }
+    },
+
+    getEngagementStore() {
+        try {
+            const raw = localStorage.getItem(CONFIG.engagementKey);
+            const data = raw ? JSON.parse(raw) : {};
+            return data && typeof data === 'object' ? data : {};
+        } catch (e) {
+            return {};
+        }
+    },
+
+    getScriptEngagement(scriptId, base = {}) {
+        const store = this.getEngagementStore();
+        const item = store[scriptId] || {};
+        return {
+            likes: Number(item.likes ?? base.likes ?? 0),
+            dislikes: Number(item.dislikes ?? base.dislikes ?? 0),
+            reaction: item.reaction || null
+        };
+    },
+
+    setScriptEngagement(scriptId, engagement) {
+        const store = this.getEngagementStore();
+        store[scriptId] = {
+            likes: Math.max(0, Number(engagement.likes || 0)),
+            dislikes: Math.max(0, Number(engagement.dislikes || 0)),
+            reaction: engagement.reaction || null
+        };
+        try {
+            localStorage.setItem(CONFIG.engagementKey, JSON.stringify(store));
+        } catch (e) {}
+    },
+
+    reactToScript(scriptId, type, event) {
+        if (event) {
+            event.preventDefault();
+            event.stopPropagation();
+        }
+        if (!scriptId || !['like', 'dislike'].includes(type)) return;
+        const current = this.getScriptEngagement(scriptId);
+        if (current.reaction === type) {
+            current[type === 'like' ? 'likes' : 'dislikes'] = Math.max(0, current[type === 'like' ? 'likes' : 'dislikes'] - 1);
+            current.reaction = null;
+        } else {
+            if (current.reaction === 'like') current.likes = Math.max(0, current.likes - 1);
+            if (current.reaction === 'dislike') current.dislikes = Math.max(0, current.dislikes - 1);
+            current[type === 'like' ? 'likes' : 'dislikes'] += 1;
+            current.reaction = type;
+        }
+        this.setScriptEngagement(scriptId, current);
+        this.updateEngagementUI(scriptId, current);
+    },
+
+    updateEngagementUI(scriptId, engagement = this.getScriptEngagement(scriptId)) {
+        document.querySelectorAll(`[data-engagement-id="${scriptId}"]`).forEach(group => {
+            const like = group.querySelector('[data-reaction="like"]');
+            const dislike = group.querySelector('[data-reaction="dislike"]');
+            const likeCount = group.querySelector('[data-count="likes"]');
+            const dislikeCount = group.querySelector('[data-count="dislikes"]');
+            if (likeCount) likeCount.textContent = engagement.likes;
+            if (dislikeCount) dislikeCount.textContent = engagement.dislikes;
+            if (like) like.classList.toggle('is-active', engagement.reaction === 'like');
+            if (dislike) dislike.classList.toggle('is-active', engagement.reaction === 'dislike');
+        });
+    },
+
+    buildGithubIssueUrl({ type, title, body }) {
+        const issueTitle = `[${type}] ${title}`.slice(0, 180);
+        const issueBody = `${body}\n\n---\nSubmitted from CihuyAkz Studio Lite`;
+        return `https://github.com/${CONFIG.repoOwner}/${CONFIG.repo}/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}`;
+    },
+
+    submitSuggestion() {
+        const titleEl = document.getElementById('suggestion-title');
+        const bodyEl = document.getElementById('suggestion-body');
+        const authorEl = document.getElementById('suggestion-author');
+        const title = titleEl ? titleEl.value.trim() : '';
+        const body = bodyEl ? bodyEl.value.trim() : '';
+        const author = authorEl ? authorEl.value.trim() : '';
+        if (!title || !body) {
+            this.showToast('Judul dan isi suggestion wajib diisi.', 'error');
+            return;
+        }
+        const issueBody = `**Suggestion**\n\n${body}\n\n**Author:** ${author || 'Anonymous'}\n**Page:** ${location.href}`;
+        const url = this.buildGithubIssueUrl({ type: 'Suggestion', title, body: issueBody });
+        window.open(url, '_blank', 'noopener,noreferrer');
+        this.toggleSuggestionModal();
+        if (titleEl) titleEl.value = '';
+        if (bodyEl) bodyEl.value = '';
+        if (authorEl) authorEl.value = '';
+        this.showToast('Form suggestion dibuka di GitHub.', 'success');
+    },
+
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-        
+
         const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
         const filtered = this.filterLogic(scripts);
         const sorted = this.sortLogic(filtered);
-        
+
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
                 <h2>No scripts found</h2>
@@ -645,9 +754,10 @@ const app = {
             </div>`;
             return;
         }
-        
+
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
+            const engagement = this.getScriptEngagement(scriptId, s.engagement || {});
             return `<div class="script-card" onclick="window.location.href='scripts/${scriptId}/index.html'">
                 <div class="card-content">
                     <div class="card-header-section">
@@ -658,6 +768,15 @@ const app = {
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
+                    </div>
+                    <div class="engagement-row card-engagement" data-engagement-id="${scriptId}">
+                        <button class="reaction-btn like-btn ${engagement.reaction === 'like' ? 'is-active' : ''}" data-reaction="like" onclick="app.reactToScript('${scriptId}', 'like', event)" aria-label="Like script">
+                            <span>👍</span> <span data-count="likes">${engagement.likes}</span>
+                        </button>
+                        <button class="reaction-btn dislike-btn ${engagement.reaction === 'dislike' ? 'is-active' : ''}" data-reaction="dislike" onclick="app.reactToScript('${scriptId}', 'dislike', event)" aria-label="Dislike script">
+                            <span>👎</span> <span data-count="dislikes">${engagement.dislikes}</span>
+                        </button>
+                        <span class="community-label">Comment / Report tersedia di halaman script</span>
                     </div>
                 </div>
             </div>`;
@@ -1233,7 +1352,7 @@ const app = {
             if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
 
             try {
-                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+                localStorage.setItem(CONFIG.dbCacheKey, JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Could not persist local database cache:', storageError);
             }
@@ -1296,8 +1415,8 @@ const app = {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapedScriptId} - CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/png" href="../../assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../../style.css">
+    <link rel="icon" type="image/png" href="../../assets/cihuyakz-icon.png">
+    <link rel="stylesheet" href="../../style.css?v=20260925-community-v1">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
@@ -1305,9 +1424,9 @@ const app = {
     <nav class="navbar">
         <div class="nav-content">
             <div class="nav-left">
-                <a href="../../index.html" class="brand" style="text-decoration: none; color: inherit;">
-                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
-                    <span class="nav-title" style="color:#ffffff;">CihuyAkz Studio Lite</span>
+                <a href="../../index.html" class="brand" style="text-decoration:none;color:inherit;">
+                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="CihuyAkz Studio Lite">
+                    <span class="nav-title">CihuyAkz Studio Lite</span>
                 </a>
             </div>
             <div class="nav-right">
@@ -1315,7 +1434,7 @@ const app = {
             </div>
         </div>
     </nav>
-    
+
     <div class="container">
         <div class="script-header-lg">
             <div>
@@ -1327,7 +1446,13 @@ const app = {
                     </span>
                 </div>
             </div>
+            <div class="engagement-row script-engagement" data-engagement-id="${scriptId}">
+                <button class="reaction-btn like-btn" data-reaction="like" onclick="reactToScript('like', event)"><span>👍</span> <span data-count="likes">0</span></button>
+                <button class="reaction-btn dislike-btn" data-reaction="dislike" onclick="reactToScript('dislike', event)"><span>👎</span> <span data-count="dislikes">0</span></button>
+            </div>
         </div>
+
+        <p class="script-community-note">Komentar, laporan bug, dan feedback dikirim melalui GitHub Issues supaya tersimpan rapi di repository.</p>
 
         <div class="code-box">
             <div class="toolbar">
@@ -1335,10 +1460,55 @@ const app = {
                 <div class="toolbar-right">
                     <button class="btn btn-sm" onclick="downloadScript()">Download</button>
                     <button class="btn btn-sm" onclick="copyScript(this)">Copy</button>
-                    <a href="raw/${filename}" class="btn btn-secondary btn-sm" target="_blank">Raw</a>
+                    <a href="raw/${filename}" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a>
                 </div>
             </div>
             <pre><code id="code-display" class="language-lua">Loading...</code></pre>
+        </div>
+
+        <section class="community-panel">
+            <div class="community-panel-header">
+                <div>
+                    <span class="community-kicker">COMMUNITY</span>
+                    <h2>Komentar & Laporan</h2>
+                </div>
+                <button class="btn btn-secondary btn-sm" onclick="openReportModal()">🚩 Report</button>
+            </div>
+            <div class="comment-form">
+                <input id="comment-author" class="input-field" maxlength="60" placeholder="Nama / username (opsional)">
+                <textarea id="comment-body" class="input-field" rows="5" maxlength="3000" placeholder="Tulis komentar tentang script ini..."></textarea>
+                <div class="comment-actions">
+                    <span class="modal-note">Komentar akan dibuka sebagai GitHub Issue baru.</span>
+                    <button class="btn" onclick="sendComment()">Kirim Komentar</button>
+                </div>
+            </div>
+        </section>
+
+        <div id="report-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this) closeReportModal()">
+            <div class="modal">
+                <div class="modal-header">
+                    <div><span class="community-kicker">REPORT</span><h3>Laporkan Script</h3></div>
+                    <button class="close-btn" onclick="closeReportModal()">×</button>
+                </div>
+                <div class="form-group">
+                    <label>Kategori</label>
+                    <select id="report-type" class="input-field">
+                        <option value="Bug">Bug / Error</option>
+                        <option value="Broken Link">Link rusak</option>
+                        <option value="Inappropriate">Konten tidak sesuai</option>
+                        <option value="Other">Lainnya</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Detail</label>
+                    <textarea id="report-body" class="input-field" rows="6" maxlength="3000" placeholder="Jelaskan masalahnya..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Nama / Username (opsional)</label>
+                    <input id="report-author" class="input-field" maxlength="60" placeholder="Anonymous">
+                </div>
+                <button class="btn btn-full" onclick="sendReport()">Kirim Report</button>
+            </div>
         </div>
     </div>
 
@@ -1347,18 +1517,93 @@ const app = {
     <script>
         const filename = '${filename}';
         const scriptId = '${scriptId}';
-        
+        const scriptTitle = ${JSON.stringify(scriptId)};
+        const repoOwner = '${CONFIG.repoOwner}';
+        const repoName = '${CONFIG.repo}';
+        const engagementKey = '${CONFIG.engagementKey}';
+
+        function getEngagementStore() {
+            try { return JSON.parse(localStorage.getItem(engagementKey) || '{}') || {}; }
+            catch (e) { return {}; }
+        }
+
+        function saveEngagement(engagement) {
+            const store = getEngagementStore();
+            store[scriptId] = engagement;
+            try { localStorage.setItem(engagementKey, JSON.stringify(store)); } catch (e) {}
+        }
+
+        function getEngagement() {
+            const store = getEngagementStore();
+            const data = store[scriptId] || {};
+            return { likes: Number(data.likes || 0), dislikes: Number(data.dislikes || 0), reaction: data.reaction || null };
+        }
+
+        function refreshEngagement() {
+            const e = getEngagement();
+            const group = document.querySelector('[data-engagement-id="' + scriptId + '"]');
+            if (!group) return;
+            group.querySelector('[data-count="likes"]').textContent = e.likes;
+            group.querySelector('[data-count="dislikes"]').textContent = e.dislikes;
+            group.querySelector('[data-reaction="like"]').classList.toggle('is-active', e.reaction === 'like');
+            group.querySelector('[data-reaction="dislike"]').classList.toggle('is-active', e.reaction === 'dislike');
+        }
+
+        function reactToScript(type, event) {
+            if (event) { event.preventDefault(); event.stopPropagation(); }
+            const e = getEngagement();
+            if (e.reaction === type) {
+                e[type === 'like' ? 'likes' : 'dislikes'] = Math.max(0, e[type === 'like' ? 'likes' : 'dislikes'] - 1);
+                e.reaction = null;
+            } else {
+                if (e.reaction === 'like') e.likes = Math.max(0, e.likes - 1);
+                if (e.reaction === 'dislike') e.dislikes = Math.max(0, e.dislikes - 1);
+                e[type === 'like' ? 'likes' : 'dislikes'] += 1;
+                e.reaction = type;
+            }
+            saveEngagement(e);
+            refreshEngagement();
+        }
+
+        function buildIssueUrl(type, title, body) {
+            const issueTitle = '[' + type + '] ' + title;
+            const issueBody = body + '\n\n---\nSubmitted from CihuyAkz Studio Lite\nScript: ' + scriptTitle + '\nURL: ' + location.href;
+            return 'https://github.com/' + repoOwner + '/' + repoName + '/issues/new?title=' + encodeURIComponent(issueTitle.slice(0, 180)) + '&body=' + encodeURIComponent(issueBody);
+        }
+
+        function sendComment() {
+            const author = (document.getElementById('comment-author').value || '').trim();
+            const body = (document.getElementById('comment-body').value || '').trim();
+            if (!body) { alert('Komentar tidak boleh kosong.'); return; }
+            const issueBody = '**Comment**\n\n' + body + '\n\n**Author:** ' + (author || 'Anonymous');
+            window.open(buildIssueUrl('Comment', scriptTitle, issueBody), '_blank', 'noopener,noreferrer');
+        }
+
+        function openReportModal() { document.getElementById('report-modal').style.display = 'flex'; }
+        function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+
+        function sendReport() {
+            const type = document.getElementById('report-type').value;
+            const body = (document.getElementById('report-body').value || '').trim();
+            const author = (document.getElementById('report-author').value || '').trim();
+            if (!body) { alert('Detail report tidak boleh kosong.'); return; }
+            const issueBody = '**Report**\n\n' + body + '\n\n**Author:** ' + (author || 'Anonymous');
+            window.open(buildIssueUrl(type, scriptTitle, issueBody), '_blank', 'noopener,noreferrer');
+            closeReportModal();
+        }
+
         async function loadScript() {
             try {
-                const res = await fetch(\`raw/\${filename}\`);
+                const res = await fetch('raw/' + filename + '?v=' + Date.now(), { cache: 'no-store' });
                 const code = await res.text();
                 document.getElementById('code-display').textContent = code;
                 Prism.highlightAll();
             } catch(e) {
                 document.getElementById('code-display').textContent = '-- Error loading source';
             }
+            refreshEngagement();
         }
-        
+
         function copyScript(btn) {
             const code = document.getElementById('code-display').textContent;
             navigator.clipboard.writeText(code).then(() => {
@@ -1367,7 +1612,7 @@ const app = {
                 setTimeout(() => btn.innerText = original, 2000);
             });
         }
-        
+
         function downloadScript() {
             const code = document.getElementById('code-display').textContent;
             const element = document.createElement('a');
@@ -1378,7 +1623,7 @@ const app = {
             element.click();
             document.body.removeChild(element);
         }
-        
+
         loadScript();
     </script>
 </body>

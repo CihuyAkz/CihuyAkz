@@ -36,6 +36,7 @@
             </div>
 
             <div class="nav-right">
+                <button class="btn btn-secondary btn-sm suggestion-nav-btn" onclick="app.toggleSuggestionModal()">💡 Suggestion</button>
                 <div id="auth-section">
                     <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Login</button>
                 </div>
@@ -63,8 +64,45 @@
         </div>
     </div>
 
+    <div id="suggestion-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleSuggestionModal()">
+        <div class="modal suggestion-modal animate__animated animate__zoomIn">
+            <div class="modal-header">
+                <div>
+                    <span class="community-kicker">COMMUNITY</span>
+                    <h3>Suggestion</h3>
+                </div>
+                <button class="close-btn" onclick="app.toggleSuggestionModal()">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-help">Kirim ide, fitur baru, atau masukan untuk CihuyAkz Studio Lite.</p>
+                <div class="form-group">
+                    <label>Judul</label>
+                    <input id="suggestion-title" class="input-field" maxlength="100" placeholder="Contoh: Tambah tema baru">
+                </div>
+                <div class="form-group">
+                    <label>Saran</label>
+                    <textarea id="suggestion-body" class="input-field" rows="6" maxlength="3000" placeholder="Tulis detail saran kamu..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Nama / Username (opsional)</label>
+                    <input id="suggestion-author" class="input-field" maxlength="60" placeholder="CihuyAkz">
+                </div>
+                <button class="btn btn-full" onclick="app.submitSuggestion()">Kirim Suggestion</button>
+                <p class="modal-note">Pengiriman akan dibuka melalui GitHub Issues agar saran bisa tercatat di repository.</p>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div id="view-home" class="view-section animate__animated animate__fadeIn" style="display:block">
+            <div class="home-community-bar">
+                <div>
+                    <span class="community-kicker">CIHUYAKZ STUDIO LITE</span>
+                    <h1>Script Library & Community</h1>
+                    <p>Bagikan script, beri reaction, kirim komentar, atau laporkan bug dari halaman script.</p>
+                </div>
+                <button class="btn" onclick="app.toggleSuggestionModal()">💡 Kirim Suggestion</button>
+            </div>
             <div class="content-wrapper">
                 <aside class="sidebar">
                     <div class="sidebar-section">

@@ -16,3 +16,9 @@ Website untuk menyimpan dan mengelola script Roblox Studio Lite / Roblox Studio.
 - `Manage` → `Add New` tetap tersedia; setelah login GitHub, perubahan script juga dikirim ke repository yang dikonfigurasi.
 
 - Login dibatasi untuk akun GitHub `CihuyAkz`; token GitHub tetap diperlukan untuk operasi Manage/Publish.
+
+
+## Community features
+- Like/dislike reactions persist per browser using localStorage.
+- Script comments and reports open a prefilled GitHub Issue.
+- Main-menu Suggestion opens a prefilled GitHub Issue.
