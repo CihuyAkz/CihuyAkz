@@ -914,41 +914,65 @@ const app = {
     async deleteScriptLogic(scriptTitle) {
         if (this.actionInProgress) return;
         this.actionInProgress = true;
-        
+
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
-            
+
             const script = this.db.scripts[scriptTitle];
             if (!script) throw new Error('Script not found');
-            
+
             const scriptId = utils.sanitizeTitle(scriptTitle);
+
+            // database.json may have been loaded from local cache, so always
+            // fetch the latest remote SHA before updating it.
+            this.dbSha = await this.getRemoteDatabaseSha();
+
+            // Delete the generated files first. If one fails, stop before
+            // changing database.json so the database does not lie about files.
             await this.deleteScriptFiles(scriptId, script.filename);
-            
-            delete this.db.scripts[scriptTitle];
-            
+
+            const nextDb = JSON.parse(JSON.stringify(this.db));
+            delete nextDb.scripts[scriptTitle];
+
             const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
-                headers: { 
-                    'Authorization': `token ${this.token}`,
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10',
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
                     message: `Remove ${scriptTitle}`,
-                    content: utils.safeBtoa(JSON.stringify(this.db, null, 2)),
-                    sha: this.dbSha
+                    content: utils.safeBtoa(JSON.stringify(nextDb, null, 2)),
+                    sha: this.dbSha,
+                    branch: CONFIG.branch
                 })
             });
-            
-            if (dbRes.ok) {
-                const newDbData = await dbRes.json();
-                this.dbSha = newDbData.content.sha;
-                this.showToast('Script deleted', 'success');
-                await this.loadDatabase();
-            } else {
-                throw new Error('Failed to update database');
+
+            if (!dbRes.ok) {
+                let detail = `HTTP ${dbRes.status}`;
+                try {
+                    const body = await dbRes.json();
+                    if (body?.message) detail += `: ${body.message}`;
+                } catch (_) {}
+                throw new Error(`Failed to update database — ${detail}`);
             }
-            
-        } catch(e) {
+
+            const newDbData = await dbRes.json();
+            this.db = nextDb;
+            this.dbSha = newDbData.content.sha;
+
+            try {
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+            } catch (storageError) {
+                console.warn('Could not persist local database cache:', storageError);
+            }
+
+            this.showToast('Script deleted', 'success');
+            await this.loadDatabase();
+
+        } catch (e) {
             console.error('Delete error:', e);
             this.showToast(`Error: ${e.message}`, 'error');
             await this.loadDatabase();
@@ -959,33 +983,59 @@ const app = {
     },
 
     async deleteScriptFiles(scriptId, filename) {
-        try {
-            const filesToDelete = [
-                `scripts/${scriptId}/index.html`,
-                `scripts/${scriptId}/raw/${filename}`
-            ];
+        const filesToDelete = [
+            `scripts/${scriptId}/index.html`,
+            `scripts/${scriptId}/raw/${filename}`
+        ];
 
-            for (const path of filesToDelete) {
-                const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-                const res = await fetch(url, { headers: { 'Authorization': `token ${this.token}` } });
-                if (res.ok) {
-                    const fileData = await res.json();
-                    await fetch(url, {
-                        method: 'DELETE',
-                        headers: { 
-                            'Authorization': `token ${this.token}`,
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            message: `Delete script file: ${path}`,
-                            sha: fileData.sha,
-                            branch: CONFIG.branch
-                        })
-                    });
+        for (const path of filesToDelete) {
+            const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
+
+            const res = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10'
                 }
+            });
+
+            // Missing file is harmless.
+            if (res.status === 404) continue;
+
+            if (!res.ok) {
+                let detail = `HTTP ${res.status}`;
+                try {
+                    const body = await res.json();
+                    if (body?.message) detail += `: ${body.message}`;
+                } catch (_) {}
+                throw new Error(`Cannot read ${path} — ${detail}`);
             }
-        } catch (e) {
-            console.error('Error explicitly deleting script files:', e);
+
+            const fileData = await res.json();
+
+            const deleteRes = await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Delete script file: ${path}`,
+                    sha: fileData.sha,
+                    branch: CONFIG.branch
+                })
+            });
+
+            if (!deleteRes.ok) {
+                let detail = `HTTP ${deleteRes.status}`;
+                try {
+                    const body = await deleteRes.json();
+                    if (body?.message) detail += `: ${body.message}`;
+                } catch (_) {}
+                throw new Error(`Cannot delete ${path} — ${detail}`);
+            }
         }
     },
 
@@ -1162,11 +1212,23 @@ const app = {
     },
 
     async getRemoteDatabaseSha() {
-        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json?t=${CONFIG.cacheBuster()}`;
+        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json?ref=${encodeURIComponent(CONFIG.branch)}&t=${CONFIG.cacheBuster()}`;
         const res = await fetch(url, {
-            headers: { 'Authorization': `token ${this.token}` }
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2026-03-10'
+            },
+            cache: 'no-store'
         });
-        if (!res.ok) throw new Error(`Failed to access remote database: ${res.status}`);
+        if (!res.ok) {
+            let detail = `HTTP ${res.status}`;
+            try {
+                const body = await res.json();
+                if (body?.message) detail += `: ${body.message}`;
+            } catch (_) {}
+            throw new Error(`Failed to access remote database — ${detail}`);
+        }
         const file = await res.json();
         return file.sha;
     },
