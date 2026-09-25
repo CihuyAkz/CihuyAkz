@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/svg+xml" href="assets/youtube-icon.svg">
-    <link rel="stylesheet" href="style.css?v=20260924-red">
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="style.css?v=20260925-red-v3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -20,7 +20,7 @@
         <div class="nav-content">
             <div class="nav-left">
                 <button class="brand" onclick="navigate('')" style="background:none;border:none;padding:0;cursor:pointer">
-                    <img src="assets/youtube-icon.svg" class="nav-icon" alt="CihuyAkz YouTube">
+                    <img src="assets/cihuyakz-icon.png" class="nav-icon" alt="CihuyAkz Studio Lite">
                     <span class="nav-title">CihuyAkz Studio Lite</span>
                 </button>
             </div>
@@ -49,16 +49,16 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Login</h3>
+                <h3>Login CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>Password</label>
+                    <label>GitHub Token</label>
                     <input type="password" id="auth-token" class="input-field" placeholder="ghp_..." autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
                 </div>
                 <div id="login-error" role="alert" aria-live="polite" style="color:var(--color-danger);font-size:13px;margin:16px 0;text-align:center;display:none"></div>
-                <button class="btn btn-full" onclick="app.login()">Enter</button>
+                <button class="btn btn-full" onclick="app.login()">Login</button>
             </div>
         </div>
     </div>

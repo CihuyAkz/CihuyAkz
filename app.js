@@ -1,6 +1,8 @@
 const CONFIG = {
-    user: 'simplyIeaf',
+    // GitHub repository used for publishing. Only this GitHub account may log in.
+    repoOwner: 'simplyIeaf',
     repo: 'simplyIeaf.github.io',
+    allowedUser: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now()
 };
@@ -173,7 +175,7 @@ const app = {
                     this.token = storedToken;
                     this.currentUser = JSON.parse(storedUser);
                     
-                    if (this.currentUser.login.toLowerCase() !== CONFIG.user.toLowerCase()) {
+                    if (this.currentUser.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
                         this.logout(true);
                         return false;
                     }
@@ -313,8 +315,8 @@ const app = {
             if (!res.ok) throw new Error('Invalid token');
             
             const user = await res.json();
-            if (user.login.toLowerCase() !== CONFIG.user.toLowerCase()) {
-                throw new Error(`Token belongs to ${user.login}, not ${CONFIG.user}.`);
+            if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
+                throw new Error(`Akses hanya untuk akun GitHub ${CONFIG.allowedUser}. Token ini milik ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -343,7 +345,7 @@ const app = {
             // Public/library view is intentionally local-first. The original project
             // fetched the old GitHub database on every page load, which made deleted
             // scripts reappear even though the bundled database was cleaned.
-            const localSaved = localStorage.getItem('cihuyakz_local_db');
+            const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
                 if (!this.db.scripts) this.db.scripts = {};
@@ -363,7 +365,7 @@ const app = {
             if (!this.db.scripts) this.db.scripts = {};
             if (!this.db.bots) this.db.bots = {};
             try {
-                localStorage.setItem('cihuyakz_local_db', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Local database cache unavailable:', storageError);
             }
@@ -426,7 +428,7 @@ const app = {
             bot.isProcessing = true;
             
             const workflowResponse = await fetch(
-                `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/actions/workflows/discord-bot.yml/dispatches`,
+                `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/actions/workflows/discord-bot.yml/dispatches`,
                 {
                     method: 'POST',
                     headers: {
@@ -489,7 +491,7 @@ const app = {
 
         try {
             const workflowResponse = await fetch(
-                `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/actions/workflows/discord-bot.yml/dispatches`,
+                `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/actions/workflows/discord-bot.yml/dispatches`,
                 {
                     method: 'POST',
                     headers: {
@@ -505,7 +507,7 @@ const app = {
                 bot.status = 'processing';
                 bot.isProcessing = false;
                 
-                const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
+                const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                     method: 'PUT',
                     headers: { 
                         'Authorization': `token ${this.token}`,
@@ -594,7 +596,7 @@ const app = {
 
             this.db.bots[botId] = botData;
 
-            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
+            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
                 headers: { 
                     'Authorization': `token ${this.token}`,
@@ -919,7 +921,7 @@ const app = {
             
             delete this.db.scripts[scriptTitle];
             
-            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
+            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
                 headers: { 
                     'Authorization': `token ${this.token}`,
@@ -959,7 +961,7 @@ const app = {
             ];
 
             for (const path of filesToDelete) {
-                const url = `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/${path}`;
+                const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
                 const res = await fetch(url, { headers: { 'Authorization': `token ${this.token}` } });
                 if (res.ok) {
                     const fileData = await res.json();
@@ -997,7 +999,7 @@ const app = {
                 this.db.bots[botId].cancelled = true;
                 this.db.bots[botId].status = 'cancelled';
                 
-                const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
+                const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                     method: 'PUT',
                     headers: { 
                         'Authorization': `token ${this.token}`,
@@ -1155,7 +1157,7 @@ const app = {
     },
 
     async getRemoteDatabaseSha() {
-        const url = `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json?t=${CONFIG.cacheBuster()}`;
+        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json?t=${CONFIG.cacheBuster()}`;
         const res = await fetch(url, {
             headers: { 'Authorization': `token ${this.token}` }
         });
@@ -1231,12 +1233,12 @@ const app = {
             if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
 
             try {
-                localStorage.setItem('cihuyakz_local_db', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Could not persist local database cache:', storageError);
             }
             
-            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/database.json`, {
+            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
                 headers: { 
                     'Authorization': `token ${this.token}`,
@@ -1294,7 +1296,7 @@ const app = {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapedScriptId} - CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/png" href="../../assets/youtube-icon.svg">
+    <link rel="icon" type="image/png" href="../../assets/favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="../../style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -1304,7 +1306,7 @@ const app = {
         <div class="nav-content">
             <div class="nav-left">
                 <a href="../../index.html" class="brand" style="text-decoration: none; color: inherit;">
-                    <img src="../../assets/youtube-icon.svg" class="nav-icon" alt="Icon">
+                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
                     <span class="nav-title" style="color:#ffffff;">CihuyAkz Studio Lite</span>
                 </a>
             </div>
@@ -1391,7 +1393,7 @@ const app = {
     },
 
     async createOrUpdateFile(path, content, contentType) {
-        const url = `https://api.github.com/repos/${CONFIG.user}/${CONFIG.repo}/contents/${path}`;
+        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
         const getRes = await fetch(url, { headers: { 'Authorization': `token ${this.token}` } });
         
         let sha = null;

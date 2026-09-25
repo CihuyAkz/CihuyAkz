@@ -14,3 +14,5 @@ Website untuk menyimpan dan mengelola script Roblox Studio Lite / Roblox Studio.
 - Tema antarmuka merah gradient.
 - Favicon menggunakan ikon YouTube.
 - `Manage` → `Add New` tetap tersedia; setelah login GitHub, perubahan script juga dikirim ke repository yang dikonfigurasi.
+
+- Login dibatasi untuk akun GitHub `CihuyAkz`; token GitHub tetap diperlukan untuk operasi Manage/Publish.
