@@ -2,21 +2,18 @@
 
 A lightweight website for storing and managing Roblox Studio Lite / Roblox Studio scripts.
 
-## Features
+- Theme: red gradient
+- Built-in script: `Example Script`
+- New scripts can be added from `Manage` → `Add New`
+- Script cards support optional hover thumbnails with a red gradient overlay
+- Thumbnail fields are optional and can use a direct image URL or a relative image path
+- The bundled `Example Script` uses the supplied illustration as its sample thumbnail
+- Web icon: CihuyAkz YouTube icon
 
-- Red gradient interface
-- Built-in `Example Script`
-- `Manage` → `Add New` for creating and publishing scripts
-- Optional script thumbnails managed from the editor
-- Thumbnail previews appear only while hovering over a script card and disappear when the pointer leaves
-- GitHub login restricted to the configured `CihuyAkz` account
-- GitHub token required for Manage/Publish operations
-- Local `database.json` is loaded first so removed remote scripts do not reappear
-
-## Thumbnail field
-
-`Thumbnail URL (Optional)` accepts an `http://` or `https://` image URL. Leave it empty to disable the thumbnail. The value is stored in `database.json` with the script metadata and is rendered as a hover-only preview in the public script library.
-
-## Publishing
-
-After signing in with the configured GitHub account, `Manage` → `Add New` or editing an existing script publishes script metadata and source files to the configured repository.
+### Lite Version Notes
+- The public script library loads `database.json` locally first so removed remote scripts do not reappear.
+- The built-in script is `Example Script`.
+- The interface uses a red gradient theme.
+- The favicon uses the CihuyAkz YouTube icon.
+- `Manage` → `Add New` remains available; after GitHub login, script changes are also pushed to the configured repository.
+- Login is restricted to the configured GitHub account; a GitHub token is required for Manage/Publish operations.

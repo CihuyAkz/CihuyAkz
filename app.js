@@ -1,6 +1,6 @@
 const CONFIG = {
     // GitHub repository used for publishing. Only this GitHub account may log in.
-    repoOwner: 'CihuyAkz',
+    repoOwner: 'simplyIeaf',
     repo: 'simplyIeaf.github.io',
     allowedUser: 'CihuyAkz',
     branch: 'main',
@@ -64,23 +64,18 @@ const utils = {
         return null;
     },
 
-    validateThumbnailUrl(value) {
-        const url = (value || '').trim();
-        if (!url) return null;
-
-        try {
-            const parsed = new URL(url, window.location.href);
-            if (!['http:', 'https:'].includes(parsed.protocol)) {
-                return 'Thumbnail URL must use http:// or https://';
-            }
-        } catch (e) {
-            return 'Thumbnail URL is invalid';
+    validateThumbnail(thumbnail) {
+        if (!thumbnail) return null;
+        if (thumbnail.length > 1200) return 'Thumbnail URL is too long';
+        if (/^data:/i.test(thumbnail) || /^javascript:/i.test(thumbnail)) {
+            return 'Thumbnail must use a normal image URL or a relative image path';
         }
-
-        if (url.length > 2000) return 'Thumbnail URL is too long';
-        return null;
+        if (/^https?:\/\//i.test(thumbnail) || /^(?:\.\.?\/|\/|assets\/|scripts\/)/i.test(thumbnail)) {
+            return null;
+        }
+        return 'Thumbnail must use https://, http://, or a relative image path';
     },
-
+    
     formatDisplayTime(isoString, timezone) {
         const date = new Date(isoString);
         return date.toLocaleString('en-US', {
@@ -333,7 +328,7 @@ const app = {
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
-                throw new Error(`Only the GitHub account ${CONFIG.allowedUser} can log in. This token belongs to ${user.login}.`);
+                throw new Error(`Only the GitHub account ${CONFIG.allowedUser} can manage this site. This token belongs to ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -351,6 +346,17 @@ const app = {
         }
     },
 
+    normalizeDatabase() {
+        if (!this.db || typeof this.db !== 'object') this.db = {};
+        if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
+        if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
+
+        const example = this.db.scripts['Example Script'];
+        if (example && typeof example.thumbnail === 'undefined') {
+            example.thumbnail = 'assets/example-thumbnail.jpg';
+        }
+    },
+
     async loadDatabase() {
         try {
             this.isLoading = true;
@@ -362,11 +368,10 @@ const app = {
             // Public/library view is intentionally local-first. The original project
             // fetched the old GitHub database on every page load, which made deleted
             // scripts reappear even though the bundled database was cleaned.
-            const localSaved = localStorage.getItem('cihuyakz_local_db_v3');
+            const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
-                if (!this.db.scripts) this.db.scripts = {};
-                if (!this.db.bots) this.db.bots = {};
+                this.normalizeDatabase();
                 this.renderList();
                 this.renderAdminList();
                 return;
@@ -379,10 +384,9 @@ const app = {
             if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
 
             this.db = await localRes.json();
-            if (!this.db.scripts) this.db.scripts = {};
-            if (!this.db.bots) this.db.bots = {};
+            this.normalizeDatabase();
             try {
-                localStorage.setItem('cihuyakz_local_db_v3', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Local database cache unavailable:', storageError);
             }
@@ -650,11 +654,11 @@ const app = {
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-
+        
         const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
         const filtered = this.filterLogic(scripts);
         const sorted = this.sortLogic(filtered);
-
+        
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
                 <h2>No scripts found</h2>
@@ -662,24 +666,24 @@ const app = {
             </div>`;
             return;
         }
-
+        
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
-            const thumbnail = (s.thumbnail || '').trim();
-            const thumbnailMarkup = thumbnail ? `
-                <div class="script-thumbnail" aria-hidden="true">
-                    <img src="${utils.escapeHtml(thumbnail)}" alt="" loading="lazy"
-                        onerror="this.closest('.script-thumbnail').classList.add('thumbnail-error')">
-                </div>` : '';
-
-            return `<div class="script-card${thumbnail ? ' has-thumbnail' : ''}" onclick="window.location.href='scripts/${scriptId}/index.html'">
-                ${thumbnailMarkup}
+            const safeTitle = utils.escapeHtml(s.title);
+            const thumbnail = typeof s.thumbnail === 'string' ? s.thumbnail.trim() : '';
+            const safeThumbnail = thumbnail ? utils.escapeHtml(thumbnail) : '';
+            return `<div class="script-card${thumbnail ? ' has-thumbnail' : ''}" tabindex="0" role="link" aria-label="Open ${safeTitle}" onclick="window.location.href='scripts/${scriptId}/index.html'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+                ${thumbnail ? `<div class="script-card-media" aria-hidden="true">
+                    <div class="script-card-media-gradient"></div>
+                    <img src="${safeThumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.script-card').classList.add('thumbnail-error')">
+                </div>` : ''}
                 <div class="card-content">
                     <div class="card-header-section">
-                        <h3 class="script-title">${utils.escapeHtml(s.title)}</h3>
+                        <h3 class="script-title">${safeTitle}</h3>
                         ${s.visibility !== 'PUBLIC' ? `<span class="badge badge-${s.visibility.toLowerCase()}">${s.visibility}</span>` : ''}
                     </div>
-                    ${s.description ? `<p style="color:var(--color-text-muted);font-size:13px;margin:8px 0">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
+                    ${s.description ? `<p class="script-card-description">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
+                    ${thumbnail ? `<span class="thumbnail-hint">Hover to preview thumbnail</span>` : ''}
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
@@ -774,21 +778,13 @@ const app = {
         }
         list.innerHTML = sorted.map(s => {
             const updated = s.updated ? new Date(s.updated).toLocaleDateString() : new Date(s.created).toLocaleDateString();
-            const thumbnail = (s.thumbnail || '').trim();
-            const thumbnailPreview = thumbnail ? `
-                <div class="admin-thumbnail" aria-hidden="true">
-                    <img src="${utils.escapeHtml(thumbnail)}" alt="" loading="lazy"
-                        onerror="this.parentElement.classList.add('thumbnail-error')">
-                </div>` : '';
-
-            return `<div class="admin-item" data-script-title="${utils.escapeHtml(s.title)}" onclick="app.populateEditor(this.dataset.scriptTitle)">
-                ${thumbnailPreview}
+            return `<div class="admin-item" data-script-title="${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}" onclick="app.populateEditor('${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}')">
                 <div class="admin-item-left">
                     <strong>${utils.escapeHtml(s.title)}</strong>
                     <div class="admin-meta">
                         <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
-                        ${thumbnail ? '<span class="thumbnail-status">Thumbnail</span>' : '<span class="text-muted">No thumbnail</span>'}
                         <span class="text-muted">Updated ${updated}</span>
+                        ${s.thumbnail ? '<span class="thumbnail-admin-status">Thumbnail</span>' : ''}
                     </div>
                 </div>
                 <div class="admin-item-right">
@@ -1069,10 +1065,9 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = '';
-
         const editThumbnail = document.getElementById('edit-thumbnail');
         if (editThumbnail) editThumbnail.value = '';
-        this.updateThumbnailPreview('');
+        this.updateThumbnailPreview();
         
         if (window.cmEditor) window.cmEditor.setValue('');
         
@@ -1115,24 +1110,21 @@ const app = {
         }
     },
 
-    updateThumbnailPreview(url) {
+    updateThumbnailPreview() {
+        const input = document.getElementById('edit-thumbnail');
         const preview = document.getElementById('thumbnail-preview');
-        if (!preview) return;
+        if (!input || !preview) return;
 
-        const normalized = (url || '').trim();
-        if (!normalized) {
-            preview.innerHTML = '<span>No thumbnail selected</span>';
-            preview.classList.remove('has-image', 'thumbnail-error');
+        const value = input.value.trim();
+        if (!value) {
+            preview.classList.remove('has-image');
+            preview.innerHTML = '<span>No thumbnail</span>';
             return;
         }
 
+        const safeValue = utils.escapeHtml(value);
         preview.classList.add('has-image');
-        preview.classList.remove('thumbnail-error');
-        preview.innerHTML = `
-            <img src="${utils.escapeHtml(normalized)}" alt="Thumbnail preview"
-                onerror="this.parentElement.classList.add('thumbnail-error')">
-            <span class="thumbnail-preview-label">Thumbnail preview</span>
-        `;
+        preview.innerHTML = `<div class="thumbnail-preview-glow"></div><img src="${safeValue}" alt="Thumbnail preview" onerror="this.closest('.thumbnail-preview').classList.add('preview-error')">`;
     },
 
     async populateEditor(title) {
@@ -1151,12 +1143,9 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = s.description || '';
-
         const editThumbnail = document.getElementById('edit-thumbnail');
-        if (editThumbnail) {
-            editThumbnail.value = s.thumbnail || '';
-            this.updateThumbnailPreview(s.thumbnail || '');
-        }
+        if (editThumbnail) editThumbnail.value = s.thumbnail || '';
+        this.updateThumbnailPreview();
         
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
@@ -1242,6 +1231,7 @@ const app = {
         const titleInput = document.getElementById('edit-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
+        const thumbnailInput = document.getElementById('edit-thumbnail');
         const saveBtn = document.querySelector('.editor-actions .btn:last-child');
         
         if (!titleInput || !visibilityInput || !saveBtn) {
@@ -1254,14 +1244,13 @@ const app = {
         const visibility = visibilityInput.value;
         const code = window.cmEditor ? window.cmEditor.getValue() : '';
         const desc = descInput ? descInput.value.trim() : '';
-        const thumbnailInput = document.getElementById('edit-thumbnail');
         const thumbnail = thumbnailInput ? thumbnailInput.value.trim() : '';
         const originalBtnText = saveBtn.textContent;
         
         const titleError = utils.validateTitle(title);
         const codeError = utils.validateCode(code);
-        const thumbnailError = utils.validateThumbnailUrl(thumbnail);
-
+        const thumbnailError = utils.validateThumbnail(thumbnail);
+        
         if (titleError || codeError || thumbnailError) {
             this.showToast(titleError || codeError || thumbnailError, 'error');
             this.actionInProgress = false;
@@ -1288,7 +1277,7 @@ const app = {
                 displayTitle: title,
                 visibility: visibility,
                 description: desc,
-                thumbnail: thumbnail || null,
+                thumbnail: thumbnail,
                 filename: filename,
                 size: code.length,
                 created: originalCreationDate,
@@ -1301,7 +1290,7 @@ const app = {
             if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
 
             try {
-                localStorage.setItem('cihuyakz_local_db_v3', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Could not persist local database cache:', storageError);
             }

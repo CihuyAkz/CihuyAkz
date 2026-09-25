@@ -194,17 +194,19 @@
                             </div>
                         </div>
 
-                        <div class="form-row">
+                        <div class="form-row thumbnail-editor-row">
                             <div class="form-group form-group-flex">
-                                <label for="edit-thumbnail">Thumbnail URL <span class="label-optional">(Optional)</span></label>
-                                <input type="url" id="edit-thumbnail" class="input-field" placeholder="https://example.com/thumbnail.png" autocomplete="off" oninput="app.updateThumbnailPreview(this.value)">
-                                <span class="form-help">Shown only while hovering over the script card.</span>
-                                <div id="thumbnail-preview" class="thumbnail-preview" aria-live="polite">
-                                    <span>No thumbnail selected</span>
+                                <label for="edit-thumbnail">Thumbnail <span class="optional-label">Optional</span></label>
+                                <input type="text" id="edit-thumbnail" class="input-field" placeholder="https://example.com/thumbnail.jpg or assets/example-thumbnail.jpg" autocomplete="off" oninput="app.updateThumbnailPreview()">
+                                <small class="form-hint">Shown only while a script card is hovered, focused, or pressed. Leave empty to disable the thumbnail.</small>
+                            </div>
+                            <div class="thumbnail-preview-wrap">
+                                <div id="thumbnail-preview" class="thumbnail-preview" aria-hidden="true">
+                                    <span>No thumbnail</span>
                                 </div>
                             </div>
                         </div>
-
+    
                         <div class="form-group">
                             <label>Lua Source</label>
                             <textarea id="edit-code" class="input-field code-textarea"></textarea>
@@ -295,6 +297,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260924-red"></script>
+    <script src="app.js?v=20260925-thumbnail-hover"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>
