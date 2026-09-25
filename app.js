@@ -63,7 +63,24 @@ const utils = {
         if (code.length > 100000) return 'Code is too large (max 100KB)';
         return null;
     },
-    
+
+    validateThumbnailUrl(value) {
+        const url = (value || '').trim();
+        if (!url) return null;
+
+        try {
+            const parsed = new URL(url, window.location.href);
+            if (!['http:', 'https:'].includes(parsed.protocol)) {
+                return 'Thumbnail URL must use http:// or https://';
+            }
+        } catch (e) {
+            return 'Thumbnail URL is invalid';
+        }
+
+        if (url.length > 2000) return 'Thumbnail URL is too long';
+        return null;
+    },
+
     formatDisplayTime(isoString, timezone) {
         const date = new Date(isoString);
         return date.toLocaleString('en-US', {
@@ -75,111 +92,6 @@ const utils = {
             hour: '2-digit',
             minute: '2-digit',
             timeZoneName: 'short'
-        });
-    }
-};
-
-
-const metrics = {
-    storageKey: 'cihuyakz_metrics_v1',
-    presenceKey: 'cihuyakz_presence_v1',
-    sessionKey: 'cihuyakz_session_id_v1',
-    presenceTimer: null,
-    viewerTimer: null,
-
-    load() {
-        try {
-            const raw = localStorage.getItem(this.storageKey);
-            const data = raw ? JSON.parse(raw) : { scripts: {} };
-            if (!data.scripts) data.scripts = {};
-            return data;
-        } catch (e) {
-            return { scripts: {} };
-        }
-    },
-
-    save(data) {
-        try { localStorage.setItem(this.storageKey, JSON.stringify(data)); } catch (e) {}
-    },
-
-    ensure(slug) {
-        const data = this.load();
-        if (!data.scripts[slug]) {
-            data.scripts[slug] = { views: 0, likes: 0, dislikes: 0, reaction: null };
-        }
-        return { data, stats: data.scripts[slug] };
-    },
-
-    registerView(slug) {
-        if (!slug) return;
-        const sessionFlag = `cihuyakz_viewed_${slug}`;
-        try {
-            if (sessionStorage.getItem(sessionFlag)) return;
-            sessionStorage.setItem(sessionFlag, '1');
-        } catch (e) {}
-        const { data, stats } = this.ensure(slug);
-        stats.views += 1;
-        this.save(data);
-    },
-
-    react(slug, reaction) {
-        if (!slug || !['like', 'dislike'].includes(reaction)) return;
-        const { data, stats } = this.ensure(slug);
-        const next = stats.reaction === reaction ? null : reaction;
-        if (stats.reaction === 'like') stats.likes = Math.max(0, stats.likes - 1);
-        if (stats.reaction === 'dislike') stats.dislikes = Math.max(0, stats.dislikes - 1);
-        if (next === 'like') stats.likes += 1;
-        if (next === 'dislike') stats.dislikes += 1;
-        stats.reaction = next;
-        this.save(data);
-        return stats;
-    },
-
-    get(slug) {
-        const { stats } = this.ensure(slug);
-        return { views: Number(stats.views) || 0, likes: Number(stats.likes) || 0, dislikes: Number(stats.dislikes) || 0, reaction: stats.reaction || null };
-    },
-
-    sessionId() {
-        try {
-            let id = sessionStorage.getItem(this.sessionKey);
-            if (!id) {
-                id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-                sessionStorage.setItem(this.sessionKey, id);
-            }
-            return id;
-        } catch (e) {
-            return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-        }
-    },
-
-    updatePresence() {
-        const id = this.sessionId();
-        try {
-            const raw = localStorage.getItem(this.presenceKey);
-            const users = raw ? JSON.parse(raw) : {};
-            users[id] = Date.now();
-            const cutoff = Date.now() - 30000;
-            Object.keys(users).forEach(key => { if (Number(users[key]) < cutoff) delete users[key]; });
-            localStorage.setItem(this.presenceKey, JSON.stringify(users));
-            const count = Object.keys(users).length;
-            const el = document.getElementById('current-viewers');
-            if (el) el.textContent = String(count);
-            return count;
-        } catch (e) {
-            return 0;
-        }
-    },
-
-    startPresence() {
-        this.updatePresence();
-        clearInterval(this.presenceTimer);
-        this.presenceTimer = setInterval(() => this.updatePresence(), 10000);
-        window.addEventListener('storage', (event) => {
-            if (event.key === this.presenceKey || event.key === this.storageKey) {
-                this.updatePresence();
-                if (window.app && typeof window.app.renderList === 'function') window.app.renderList();
-            }
         });
     }
 };
@@ -203,7 +115,6 @@ const app = {
     async init() {
         const sessionValid = await this.loadSession();
         await this.loadDatabase();
-        metrics.startPresence();
         this.handleRouting();
         window.addEventListener('hashchange', () => this.handleRouting());
         
@@ -330,14 +241,6 @@ const app = {
         }
     },
 
-    openManage() {
-        if (this.currentUser) {
-            navigate('admin');
-            return;
-        }
-        this.toggleLoginModal();
-    },
-
     async login() {
         if (this.actionInProgress) return;
         this.actionInProgress = true;
@@ -430,7 +333,7 @@ const app = {
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
-                throw new Error(`Akses hanya untuk akun GitHub ${CONFIG.allowedUser}. Token ini milik ${user.login}.`);
+                throw new Error(`Only the GitHub account ${CONFIG.allowedUser} can log in. This token belongs to ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -459,7 +362,7 @@ const app = {
             // Public/library view is intentionally local-first. The original project
             // fetched the old GitHub database on every page load, which made deleted
             // scripts reappear even though the bundled database was cleaned.
-            const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
+            const localSaved = localStorage.getItem('cihuyakz_local_db_v3');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
                 if (!this.db.scripts) this.db.scripts = {};
@@ -479,7 +382,7 @@ const app = {
             if (!this.db.scripts) this.db.scripts = {};
             if (!this.db.bots) this.db.bots = {};
             try {
-                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v3', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Local database cache unavailable:', storageError);
             }
@@ -762,9 +665,15 @@ const app = {
 
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
-            const stats = metrics.get(scriptId);
-            const reaction = stats.reaction;
-            return `<div class="script-card" onclick="window.location.href='scripts/${scriptId}/index.html'">
+            const thumbnail = (s.thumbnail || '').trim();
+            const thumbnailMarkup = thumbnail ? `
+                <div class="script-thumbnail" aria-hidden="true">
+                    <img src="${utils.escapeHtml(thumbnail)}" alt="" loading="lazy"
+                        onerror="this.closest('.script-thumbnail').classList.add('thumbnail-error')">
+                </div>` : '';
+
+            return `<div class="script-card${thumbnail ? ' has-thumbnail' : ''}" onclick="window.location.href='scripts/${scriptId}/index.html'">
+                ${thumbnailMarkup}
                 <div class="card-content">
                     <div class="card-header-section">
                         <h3 class="script-title">${utils.escapeHtml(s.title)}</h3>
@@ -774,22 +683,10 @@ const app = {
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
-                        <span title="Views">👁 ${stats.views}</span>
-                    </div>
-                    <div class="script-reactions" onclick="event.stopPropagation()">
-                        <button class="reaction-btn ${reaction === 'like' ? 'active-like' : ''}" onclick="app.reactToScript('${scriptId}','like', this)" aria-label="Like ${utils.escapeHtml(s.title)}">👍 <span>${stats.likes}</span></button>
-                        <button class="reaction-btn ${reaction === 'dislike' ? 'active-dislike' : ''}" onclick="app.reactToScript('${scriptId}','dislike', this)" aria-label="Dislike ${utils.escapeHtml(s.title)}">👎 <span>${stats.dislikes}</span></button>
                     </div>
                 </div>
             </div>`;
         }).join('');
-    },
-
-    reactToScript(slug, reaction, button) {
-        const stats = metrics.react(slug, reaction);
-        if (!stats) return;
-        this.renderList();
-        this.showToast(reaction === 'like' ? 'Like updated' : 'Dislike updated', 'success');
     },
 
     filterLogic(scripts) {
@@ -877,13 +774,21 @@ const app = {
         }
         list.innerHTML = sorted.map(s => {
             const updated = s.updated ? new Date(s.updated).toLocaleDateString() : new Date(s.created).toLocaleDateString();
-            return `<div class="admin-item" data-script-title="${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}" onclick="app.populateEditor('${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}')">
+            const thumbnail = (s.thumbnail || '').trim();
+            const thumbnailPreview = thumbnail ? `
+                <div class="admin-thumbnail" aria-hidden="true">
+                    <img src="${utils.escapeHtml(thumbnail)}" alt="" loading="lazy"
+                        onerror="this.parentElement.classList.add('thumbnail-error')">
+                </div>` : '';
+
+            return `<div class="admin-item" data-script-title="${utils.escapeHtml(s.title)}" onclick="app.populateEditor(this.dataset.scriptTitle)">
+                ${thumbnailPreview}
                 <div class="admin-item-left">
                     <strong>${utils.escapeHtml(s.title)}</strong>
                     <div class="admin-meta">
                         <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
+                        ${thumbnail ? '<span class="thumbnail-status">Thumbnail</span>' : '<span class="text-muted">No thumbnail</span>'}
                         <span class="text-muted">Updated ${updated}</span>
-                        <span class="text-muted">👁 ${metrics.get(utils.sanitizeTitle(s.title)).views} · 👍 ${metrics.get(utils.sanitizeTitle(s.title)).likes} · 👎 ${metrics.get(utils.sanitizeTitle(s.title)).dislikes}</span>
                     </div>
                 </div>
                 <div class="admin-item-right">
@@ -1164,6 +1069,10 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = '';
+
+        const editThumbnail = document.getElementById('edit-thumbnail');
+        if (editThumbnail) editThumbnail.value = '';
+        this.updateThumbnailPreview('');
         
         if (window.cmEditor) window.cmEditor.setValue('');
         
@@ -1206,6 +1115,26 @@ const app = {
         }
     },
 
+    updateThumbnailPreview(url) {
+        const preview = document.getElementById('thumbnail-preview');
+        if (!preview) return;
+
+        const normalized = (url || '').trim();
+        if (!normalized) {
+            preview.innerHTML = '<span>No thumbnail selected</span>';
+            preview.classList.remove('has-image', 'thumbnail-error');
+            return;
+        }
+
+        preview.classList.add('has-image');
+        preview.classList.remove('thumbnail-error');
+        preview.innerHTML = `
+            <img src="${utils.escapeHtml(normalized)}" alt="Thumbnail preview"
+                onerror="this.parentElement.classList.add('thumbnail-error')">
+            <span class="thumbnail-preview-label">Thumbnail preview</span>
+        `;
+    },
+
     async populateEditor(title) {
         if (!this.currentUser || !this.db || !this.db.scripts[title]) return;
         const s = this.db.scripts[title];
@@ -1222,6 +1151,12 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = s.description || '';
+
+        const editThumbnail = document.getElementById('edit-thumbnail');
+        if (editThumbnail) {
+            editThumbnail.value = s.thumbnail || '';
+            this.updateThumbnailPreview(s.thumbnail || '');
+        }
         
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
@@ -1319,13 +1254,16 @@ const app = {
         const visibility = visibilityInput.value;
         const code = window.cmEditor ? window.cmEditor.getValue() : '';
         const desc = descInput ? descInput.value.trim() : '';
+        const thumbnailInput = document.getElementById('edit-thumbnail');
+        const thumbnail = thumbnailInput ? thumbnailInput.value.trim() : '';
         const originalBtnText = saveBtn.textContent;
         
         const titleError = utils.validateTitle(title);
         const codeError = utils.validateCode(code);
-        
-        if (titleError || codeError) {
-            this.showToast(titleError || codeError, 'error');
+        const thumbnailError = utils.validateThumbnailUrl(thumbnail);
+
+        if (titleError || codeError || thumbnailError) {
+            this.showToast(titleError || codeError || thumbnailError, 'error');
             this.actionInProgress = false;
             return;
         }
@@ -1350,6 +1288,7 @@ const app = {
                 displayTitle: title,
                 visibility: visibility,
                 description: desc,
+                thumbnail: thumbnail || null,
                 filename: filename,
                 size: code.length,
                 created: originalCreationDate,
@@ -1362,7 +1301,7 @@ const app = {
             if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
 
             try {
-                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+                localStorage.setItem('cihuyakz_local_db_v3', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Could not persist local database cache:', storageError);
             }
@@ -1458,12 +1397,6 @@ const app = {
             </div>
         </div>
 
-        <div class="script-metrics" aria-live="polite">
-            <span class="metric-pill">👁 <span id="view-count">0</span> views</span>
-            <button class="reaction-btn" id="like-btn" type="button" onclick="react('like')">👍 <span id="like-count">0</span></button>
-            <button class="reaction-btn" id="dislike-btn" type="button" onclick="react('dislike')">👎 <span id="dislike-count">0</span></button>
-        </div>
-
         <div class="code-box">
             <div class="toolbar">
                 <div class="file-info">raw/${filename}</div>
@@ -1513,63 +1446,6 @@ const app = {
             element.click();
             document.body.removeChild(element);
         }
-
-        const METRICS_KEY = 'cihuyakz_metrics_v1';
-        const PRESENCE_KEY = 'cihuyakz_presence_v1';
-        const SESSION_KEY = 'cihuyakz_viewed_' + scriptId;
-
-        function readMetrics() {
-            try {
-                const data = JSON.parse(localStorage.getItem(METRICS_KEY) || '{"scripts":{}}');
-                if (!data.scripts) data.scripts = {};
-                if (!data.scripts[scriptId]) data.scripts[scriptId] = { views: 0, likes: 0, dislikes: 0, reaction: null };
-                return data;
-            } catch (e) { return { scripts: { [scriptId]: { views: 0, likes: 0, dislikes: 0, reaction: null } } }; }
-        }
-        function writeMetrics(data) { try { localStorage.setItem(METRICS_KEY, JSON.stringify(data)); } catch (e) {} }
-        function paintMetrics() {
-            const data = readMetrics();
-            const stats = data.scripts[scriptId];
-            document.getElementById('view-count').textContent = stats.views;
-            document.getElementById('like-count').textContent = stats.likes;
-            document.getElementById('dislike-count').textContent = stats.dislikes;
-            document.getElementById('like-btn').classList.toggle('active-like', stats.reaction === 'like');
-            document.getElementById('dislike-btn').classList.toggle('active-dislike', stats.reaction === 'dislike');
-        }
-        function registerView() {
-            try { if (sessionStorage.getItem(SESSION_KEY)) return; sessionStorage.setItem(SESSION_KEY, '1'); } catch(e) {}
-            const data = readMetrics();
-            data.scripts[scriptId].views += 1;
-            writeMetrics(data);
-        }
-        function react(kind) {
-            const data = readMetrics();
-            const stats = data.scripts[scriptId];
-            const next = stats.reaction === kind ? null : kind;
-            if (stats.reaction === 'like') stats.likes = Math.max(0, stats.likes - 1);
-            if (stats.reaction === 'dislike') stats.dislikes = Math.max(0, stats.dislikes - 1);
-            if (next === 'like') stats.likes += 1;
-            if (next === 'dislike') stats.dislikes += 1;
-            stats.reaction = next;
-            writeMetrics(data);
-            paintMetrics();
-        }
-        function updatePresence() {
-            try {
-                const id = sessionStorage.getItem('cihuyakz_session_id_v1') || (Date.now() + '-' + Math.random().toString(36).slice(2));
-                sessionStorage.setItem('cihuyakz_session_id_v1', id);
-                const users = JSON.parse(localStorage.getItem(PRESENCE_KEY) || '{}');
-                users[id] = Date.now();
-                const cutoff = Date.now() - 30000;
-                Object.keys(users).forEach(k => { if (Number(users[k]) < cutoff) delete users[k]; });
-                localStorage.setItem(PRESENCE_KEY, JSON.stringify(users));
-            } catch(e) {}
-        }
-        registerView();
-        paintMetrics();
-        updatePresence();
-        setInterval(updatePresence, 10000);
-        window.addEventListener('storage', paintMetrics);
         
         loadScript();
     </script>

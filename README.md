@@ -1,18 +1,22 @@
 # CihuyAkz Studio Lite
 
-Website untuk menyimpan dan mengelola script Roblox Studio Lite / Roblox Studio.
+A lightweight website for storing and managing Roblox Studio Lite / Roblox Studio scripts.
 
-- Tema: merah gradient
-- Script bawaan: hanya `Example Script`
-- Script baru dapat ditambahkan dari menu `Manage` → `Add New`
-- Ikon web: ikon YouTube CihuyAkz
+## Features
 
+- Red gradient interface
+- Built-in `Example Script`
+- `Manage` → `Add New` for creating and publishing scripts
+- Optional script thumbnails managed from the editor
+- Thumbnail previews appear only while hovering over a script card and disappear when the pointer leaves
+- GitHub login restricted to the configured `CihuyAkz` account
+- GitHub token required for Manage/Publish operations
+- Local `database.json` is loaded first so removed remote scripts do not reappear
 
-### Perubahan versi Lite
-- Library script publik menggunakan `database.json` lokal terlebih dahulu agar script lama dari database remote tidak muncul lagi.
-- Script bawaan hanya `Example Script`.
-- Tema antarmuka merah gradient.
-- Favicon menggunakan ikon YouTube.
-- `Manage` → `Add New` tetap tersedia; setelah login GitHub, perubahan script juga dikirim ke repository yang dikonfigurasi.
+## Thumbnail field
 
-- Login dibatasi untuk akun GitHub `CihuyAkz`; token GitHub tetap diperlukan untuk operasi Manage/Publish.
+`Thumbnail URL (Optional)` accepts an `http://` or `https://` image URL. Leave it empty to disable the thumbnail. The value is stored in `database.json` with the script metadata and is rendered as a hover-only preview in the public script library.
+
+## Publishing
+
+After signing in with the configured GitHub account, `Manage` → `Add New` or editing an existing script publishes script metadata and source files to the configured repository.

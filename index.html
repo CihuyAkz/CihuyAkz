@@ -37,7 +37,7 @@
 
             <div class="nav-right">
                 <div id="auth-section">
-                    <button class="btn btn-secondary btn-sm" onclick="app.openManage()">Manage</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Login</button>
                 </div>
                 <div id="user-section" style="display:none">
                     <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
@@ -49,7 +49,7 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Manage CihuyAkz</h3>
+                <h3>Login CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
@@ -58,7 +58,7 @@
                     <input type="password" id="auth-token" class="input-field" placeholder="ghp_..." autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
                 </div>
                 <div id="login-error" role="alert" aria-live="polite" style="color:var(--color-danger);font-size:13px;margin:16px 0;text-align:center;display:none"></div>
-                <button class="btn btn-full" onclick="app.login()">Manage</button>
+                <button class="btn btn-full" onclick="app.login()">Login</button>
             </div>
         </div>
     </div>
@@ -114,7 +114,6 @@
                 </aside>
                 
                 <main class="main-content">
-                    <div class="live-viewers-bar" aria-live="polite">👁 <strong id="current-viewers">0</strong> Current View</div>
                     <div class="script-grid" id="script-list">
                         <div style="text-align:center;padding:60px 0;grid-column:1/-1">
                             <div class="spinner"></div>
@@ -194,7 +193,18 @@
                                 <textarea id="edit-desc" class="input-field" rows="4" placeholder="Briefly describe your script..."></textarea>
                             </div>
                         </div>
-    
+
+                        <div class="form-row">
+                            <div class="form-group form-group-flex">
+                                <label for="edit-thumbnail">Thumbnail URL <span class="label-optional">(Optional)</span></label>
+                                <input type="url" id="edit-thumbnail" class="input-field" placeholder="https://example.com/thumbnail.png" autocomplete="off" oninput="app.updateThumbnailPreview(this.value)">
+                                <span class="form-help">Shown only while hovering over the script card.</span>
+                                <div id="thumbnail-preview" class="thumbnail-preview" aria-live="polite">
+                                    <span>No thumbnail selected</span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="form-group">
                             <label>Lua Source</label>
                             <textarea id="edit-code" class="input-field code-textarea"></textarea>
@@ -285,6 +295,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260925-red-metrics-v1"></script>
+    <script src="app.js?v=20260924-red"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>
