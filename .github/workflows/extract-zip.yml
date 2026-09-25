@@ -1,4 +1,4 @@
-name: Extract ZIP and Clean Branch
+name: Extract ZIP and Flatten
 
 on:
   workflow_dispatch:
@@ -11,70 +11,80 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract ZIP
+      - name: Extract and flatten ZIP
         shell: bash
         run: |
           set -e
 
-          ZIP_FILE=$(find . -type f -name "*.zip" -print -quit)
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
 
           if [ -z "$ZIP_FILE" ]; then
-            echo "Tidak ada file ZIP ditemukan."
+            echo "ERROR: ZIP tidak ditemukan."
             exit 1
           fi
 
-          echo "ZIP ditemukan: $ZIP_FILE"
+          echo "ZIP: $ZIP_FILE"
 
-          mkdir -p extracted
+          rm -rf /tmp/extracted
+          mkdir -p /tmp/extracted
 
-          unzip -o "$ZIP_FILE" -d extracted
+          unzip -q "$ZIP_FILE" -d /tmp/extracted
 
-          echo "Isi hasil ekstraksi:"
-          find extracted -type f
+          CURRENT="/tmp/extracted"
 
-      - name: Clean branch
-        shell: bash
-        run: |
-          set -e
+          # Masuk terus selama isi folder hanya terdiri
+          # dari SATU folder dan tidak ada file lain.
+          while true; do
+            entries=()
 
-          # Simpan folder workflow sementara
-          mkdir -p /tmp/github-workflows
-          cp -r .github/workflows /tmp/github-workflows/
+            while IFS= read -r -d '' item; do
+              entries+=("$item")
+            done < <(find "$CURRENT" -mindepth 1 -maxdepth 1 -print0)
 
-          # Hapus semua isi repository
+            if [ "${#entries[@]}" -ne 1 ]; then
+              break
+            fi
+
+            item="${entries[0]}"
+
+            if [ ! -d "$item" ]; then
+              break
+            fi
+
+            echo "Folder tunggal ditemukan: $item"
+            echo "Masuk ke folder..."
+
+            CURRENT="$item"
+          done
+
+          echo "Root hasil akhir: $CURRENT"
+
+          echo "Isi yang akan dipindahkan:"
+          find "$CURRENT" -maxdepth 2 -print
+
+          # Hapus semua isi repository kecuali .git
           find . -mindepth 1 -maxdepth 1 \
             ! -name ".git" \
-            ! -name "extracted" \
-            ! -name ".github" \
             -exec rm -rf {} +
 
-          # Bersihkan .github selain workflows
-          find .github -mindepth 1 -maxdepth 1 \
-            ! -name "workflows" \
-            -exec rm -rf {} +
+          # Pindahkan hasil akhir ZIP ke root
+          cp -a "$CURRENT"/. .
 
-          # Hapus hasil ekstraksi lama dari root
-          # lalu pindahkan hasil ekstraksi ke root
-          cp -r extracted/. .
-
-          # Hapus folder sementara
-          rm -rf extracted
-
-          echo "Repository setelah dibersihkan:"
+          echo "Repository setelah extraction:"
           find . -maxdepth 3 -type f \
             ! -path "./.git/*" \
             | sort
 
-      - name: Commit and Push
+      - name: Commit and push
         shell: bash
         run: |
           set -e
 
-          git config --local user.name "github-actions[bot]"
-          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add -A
 
@@ -83,5 +93,5 @@ jobs:
             exit 0
           fi
 
-          git commit -m "Extract ZIP and clean branch"
+          git commit -m "Extract and flatten ZIP"
           git push origin HEAD:main
