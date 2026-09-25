@@ -53,26 +53,26 @@ const utils = {
     },
 
     validateTitle(title) {
-        if (!title || title.trim().length === 0) return 'Title is required';
-        if (title.length > 100) return 'Title must be less than 100 characters';
+        if (!title || title.trim().length === 0) return 'Judul wajib diisi.';
+        if (title.length > 100) return 'Judul maksimal 100 karakter.';
         const sanitized = this.sanitizeTitle(title);
         if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
-            return 'Invalid title characters';
+            return 'Karakter judul tidak valid.';
         }
         const reserved = ['con', 'prn', 'aux', 'nul'];
-        if (reserved.includes(sanitized.toLowerCase())) return 'Invalid title';
+        if (reserved.includes(sanitized.toLowerCase())) return 'Judul tidak valid.';
         return null;
     },
 
     validateCode(code) {
-        if (!code || code.trim().length === 0) return 'Code is required';
-        if (code.length > 100000) return 'Code is too large (max 100KB)';
+        if (!code || code.trim().length === 0) return 'Kode Lua wajib diisi.';
+        if (code.length > 100000) return 'Kode Lua terlalu besar (maksimal 100 KB).';
         return null;
     },
     
     formatDisplayTime(isoString, timezone) {
         const date = new Date(isoString);
-        return date.toLocaleString('en-US', {
+        return date.toLocaleString('id-ID', {
             timeZone: timezone,
             weekday: 'short',
             year: 'numeric',
@@ -105,6 +105,7 @@ const app = {
     currentEditingPageTitle: null,
     originalPageId: null,
     scheduledTimers: {},
+    insertTargetEditorId: null,
     
     async init() {
         const sessionValid = await this.loadSession();
@@ -237,6 +238,10 @@ const app = {
         const unlistedFilter = document.getElementById('unlisted-filter');
         if (privateFilter) privateFilter.style.display = 'block';
         if (unlistedFilter) unlistedFilter.style.display = 'block';
+        const adminName = document.getElementById('admin-user-name');
+        const adminAvatar = document.querySelector('.admin-avatar');
+        if (adminName) adminName.textContent = this.currentUser?.login || 'Admin';
+        if (adminAvatar) adminAvatar.textContent = (this.currentUser?.login || 'CA').slice(0, 2).toUpperCase();
     },
 
     saveSession() {
@@ -248,7 +253,7 @@ const app = {
                 localStorage.setItem('gh_token_expiry', expiry.toString());
             } catch(e) {
                 console.error('Session save error:', e);
-                this.showToast('Failed to save session', 'error');
+                this.showToast('Sesi gagal disimpan.', 'error');
             }
         }
     },
@@ -269,7 +274,7 @@ const app = {
         try {
             const token = document.getElementById('auth-token').value.trim();
             if (!token) {
-                this.showLoginError('Token is required');
+                this.showLoginError('Token GitHub wajib diisi.');
                 return;
             }
             
@@ -281,7 +286,7 @@ const app = {
                 document.getElementById('auth-token').value = '';
                 await this.loadDatabase();
                 this.renderList();
-                this.showToast('Logged in successfully!', 'success');
+                this.showToast('Berhasil masuk.', 'success');
             }
         } finally {
             this.actionInProgress = false;
@@ -327,7 +332,7 @@ const app = {
     },
 
     logout(silent = false) {
-        if (!silent && !confirm('Are you sure you want to logout?')) {
+        if (!silent && !confirm('Yakin ingin keluar dari akun?')) {
             return;
         }
         
@@ -355,7 +360,7 @@ const app = {
         location.href = '#';
         
         if (!silent) {
-            this.showToast('Logged out successfully', 'success');
+            this.showToast('Berhasil keluar.', 'success');
             setTimeout(() => location.reload(), 1000);
         }
     },
@@ -366,7 +371,7 @@ const app = {
                 headers: { 'Authorization': `token ${this.token}` }
             });
             
-            if (!res.ok) throw new Error('Invalid token');
+            if (!res.ok) throw new Error('Token GitHub tidak valid atau sudah kedaluwarsa.');
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
@@ -393,7 +398,7 @@ const app = {
             this.isLoading = true;
             const list = document.getElementById('admin-list');
             if (list) {
-                list.innerHTML = `<div style="text-align:center;padding:20px"><div class="spinner"></div><p>Loading...</p></div>`;
+                list.innerHTML = `<div style="text-align:center;padding:20px"><div class="spinner"></div><p>Memuat...</p></div>`;
             }
 
             // Public/library view is intentionally local-first. The original project
@@ -412,7 +417,7 @@ const app = {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache' }
             });
-            if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
+            if (!localRes.ok) throw new Error(`Gagal memuat database bawaan (HTTP ${localRes.status}).`);
 
             this.db = await localRes.json();
             this.normalizeDatabase();
@@ -437,11 +442,11 @@ const app = {
             const list = document.getElementById('admin-list');
             if (list) {
                 list.innerHTML = `<div class="empty-admin-state">
-                    <p style="color:var(--color-danger)">Error: ${e.message}</p>
+                    <p style="color:var(--color-danger)">Terjadi kesalahan: ${e.message}</p>
                     <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Retry</button>
                 </div>`;
             }
-            this.showToast(`Error: ${e.message}`, 'error');
+            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
         } finally {
             this.isLoading = false;
         }
@@ -452,6 +457,7 @@ const app = {
         if (!this.db.pages || typeof this.db.pages !== 'object') this.db.pages = {};
         if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
         if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
+        if (!this.db.luaSnippets || typeof this.db.luaSnippets !== 'object') this.db.luaSnippets = {};
 
         // Backward compatibility: convert legacy one-script records into one-script pages.
         for (const [legacyTitle, legacy] of Object.entries(this.db.scripts)) {
@@ -617,16 +623,16 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Triggered! Checking GitHub...', 'success');
+                    this.showToast('Bot dipicu. Memeriksa GitHub...', 'success');
                     return true;
                 }
             } else {
-                throw new Error(`GitHub Error: ${workflowResponse.status}`);
+                throw new Error(`GitHub mengembalikan HTTP ${workflowResponse.status}.`);
             }
             return false;
         } catch (error) {
             bot.isProcessing = false;
-            this.showToast(`Error: ${error.message}`, 'error');
+            this.showToast(`Terjadi kesalahan: ${error.message}`, 'error');
             return false;
         }
     },
@@ -648,7 +654,7 @@ const app = {
         const timezone = timezoneInput ? timezoneInput.value : Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         if (!title || !message) {
-            this.showToast('Title and message are required', 'error');
+            this.showToast('Judul dan pesan wajib diisi.', 'error');
             return;
         }
         
@@ -665,7 +671,7 @@ const app = {
             if (schedule && scheduleTime) {
                 const localDate = new Date(scheduleTime);
                 if (localDate < new Date()) {
-                    this.showToast('Time cannot be in the past', 'error');
+                    this.showToast('Waktu tidak boleh berada di masa lalu.', 'error');
                     this.actionInProgress = false;
                     saveBtn.disabled = false;
                     return;
@@ -703,20 +709,20 @@ const app = {
                 })
             });
 
-            if (!dbRes.ok) throw new Error('Database update failed');
+            if (!dbRes.ok) throw new Error('Gagal memperbarui database.');
 
             const newDbData = await dbRes.json();
             this.dbSha = newDbData.content.sha;
 
             if (schedule) {
-                this.showToast(`Scheduled successfully`, 'success');
+                this.showToast('Jadwal berhasil disimpan.', 'success');
                 await this.loadDatabase();
             } else {
                 await this.sendBotNow(botId);
             }
 
         } catch(e) {
-            this.showToast(`Error: ${e.message}`, 'error');
+            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
         } finally {
             saveBtn.disabled = false;
             this.actionInProgress = false;
@@ -758,9 +764,9 @@ const app = {
                         ${page.visibility !== 'PUBLIC' ? `<span class="badge badge-${page.visibility.toLowerCase()}">${page.visibility}</span>` : ''}
                     </div>
                     ${page.description ? `<p class="page-description">${utils.escapeHtml(page.description.substring(0, 170))}${page.description.length > 170 ? '...' : ''}</p>` : ''}
-                    <div class="page-script-preview">${scriptNames || 'No script items yet'}</div>
+                    <div class="page-script-preview">${scriptNames || 'Belum ada script.'}</div>
                     <div class="card-meta">
-                        <span>${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
+                        <span>${scriptsCount} script</span>
                         <span class="page-open">Open <span>→</span></span>
                     </div>
                 </div>
@@ -828,6 +834,10 @@ const app = {
             document.getElementById('admin-tab-list').style.display = 'block';
             activeTab?.classList.add('active');
             this.renderAdminList();
+        } else if (tab === 'snippets') {
+            document.getElementById('admin-tab-snippets').style.display = 'block';
+            activeTab?.classList.add('active');
+            this.renderLuaLibrary();
         } else if (tab === 'bots') {
             document.getElementById('admin-tab-bots').style.display = 'block';
             activeTab?.classList.add('active');
@@ -846,6 +856,223 @@ const app = {
         }
     },
 
+
+    collectEditorScripts() {
+        const list = document.getElementById('script-editor-list');
+        if (!list) return [];
+        return Array.from(list.querySelectorAll('.script-editor-card')).map((card, index) => {
+            const editorId = card.dataset.editorId;
+            const editor = editorId ? this.pageEditors[editorId] : null;
+            const name = card.querySelector('.script-name-input')?.value.trim() || '';
+            const code = editor ? editor.getValue() : (card.querySelector('.page-code-textarea')?.value || '');
+            return {
+                id: card.dataset.scriptId || utils.sanitizeTitle(name) || `script-${index + 1}`,
+                oldId: card.dataset.scriptId || '',
+                name,
+                code
+            };
+        });
+    },
+
+    makeUniqueScriptIds(scripts, oldPage = null) {
+        const used = new Set();
+        return scripts.map((script, index) => {
+            const previous = oldPage?.scripts?.find(item => item.id === script.oldId);
+            const base = utils.sanitizeTitle(previous?.id || script.id || script.name) || `script-${index + 1}`;
+            let id = base;
+            let n = 2;
+            while (used.has(id)) id = `${base}-${n++}`;
+            used.add(id);
+            return { ...script, id };
+        });
+    },
+
+    async deletePageConfirmation(title) {
+        const page = this.db?.pages?.[title];
+        if (!page || this.actionInProgress) {
+            this.showToast('Page tidak ditemukan.', 'error');
+            return;
+        }
+        let confirmed = false;
+        if (typeof Swal !== 'undefined') {
+            const result = await Swal.fire({
+                title: 'Hapus page?',
+                text: `“${page.title}” dan semua script di dalamnya akan dihapus.`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Hapus Page',
+                cancelButtonText: 'Batal',
+                confirmButtonColor: '#ef4444'
+            });
+            confirmed = result.isConfirmed;
+        } else {
+            confirmed = confirm(`Hapus page “${page.title}”?`);
+        }
+        if (!confirmed) return;
+        this.actionInProgress = true;
+        try {
+            if (typeof NProgress !== 'undefined') NProgress.start();
+            await this.deletePageFiles(page.id, page.scripts || []);
+            delete this.db.pages[title];
+            await this.persistDatabase(`Hapus page: ${title}`);
+            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
+            this.showToast('Page berhasil dihapus.', 'success');
+            await this.loadDatabase();
+            this.switchAdminTab('list');
+        } catch (error) {
+            this.showToast(`Gagal menghapus page: ${error.message}`, 'error');
+        } finally {
+            this.actionInProgress = false;
+            if (typeof NProgress !== 'undefined') NProgress.done();
+        }
+    },
+
+    async deletePageFiles(pageId, scripts = []) {
+        const paths = [
+            `pages/${pageId}/index.html`,
+            ...(scripts || []).map(script => `pages/${pageId}/raw/${script.filename || `${script.id}.lua`}`),
+            `scripts/${pageId}/index.html`,
+            ...(scripts || []).map(script => `scripts/${pageId}/raw/${script.filename || `${script.id}.lua`}`)
+        ];
+        for (const path of paths) await this.deleteRemoteFile(path);
+    },
+
+    resetSnippetEditor() {
+        const id = document.getElementById('snippet-id');
+        const title = document.getElementById('snippet-title');
+        const desc = document.getElementById('snippet-desc');
+        const code = document.getElementById('snippet-code');
+        const heading = document.getElementById('snippet-editor-heading');
+        const button = document.getElementById('snippet-save-btn');
+        if (id) id.value = '';
+        if (title) title.value = '';
+        if (desc) desc.value = '';
+        if (code) code.value = '';
+        if (heading) heading.textContent = 'Tambah Potongan Lua';
+        if (button) button.textContent = 'Simpan Potongan';
+        this.renderLuaLibrary();
+    },
+
+    renderLuaLibrary() {
+        const list = document.getElementById('lua-snippet-list');
+        if (!list || !this.db) return;
+        const query = (document.getElementById('snippet-search')?.value || '').trim().toLowerCase();
+        const snippets = Object.values(this.db.luaSnippets || {})
+            .filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query))
+            .sort((a,b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
+        if (!snippets.length) {
+            list.innerHTML = `<div class="library-empty"><div class="library-empty-icon">LUA</div><h4>${query ? 'Potongan tidak ditemukan' : 'Belum ada potongan Lua'}</h4><p>Simpan kode yang sering dipakai sekali, lalu sisipkan ke script mana pun.</p></div>`;
+            return;
+        }
+        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Potongan Lua siap digunakan.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Edit</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Hapus</button></div></article>`).join('');
+    },
+
+    editLuaSnippet(encodedId) {
+        const id = decodeURIComponent(encodedId);
+        const item = this.db?.luaSnippets?.[id];
+        if (!item) return this.showToast('Potongan Lua tidak ditemukan.', 'error');
+        document.getElementById('snippet-id').value = item.id;
+        document.getElementById('snippet-title').value = item.name || '';
+        document.getElementById('snippet-desc').value = item.description || '';
+        document.getElementById('snippet-code').value = item.code || '';
+        document.getElementById('snippet-editor-heading').textContent = `Edit: ${item.name}`;
+        document.getElementById('snippet-save-btn').textContent = 'Perbarui Potongan';
+        this.switchAdminTab('snippets');
+        document.getElementById('snippet-title')?.focus();
+    },
+
+    async saveLuaSnippet() {
+        if (!this.currentUser || !this.db || this.actionInProgress) return;
+        const idEl = document.getElementById('snippet-id');
+        const title = document.getElementById('snippet-title')?.value.trim() || '';
+        const description = document.getElementById('snippet-desc')?.value.trim() || '';
+        const code = document.getElementById('snippet-code')?.value || '';
+        const existingId = idEl?.value.trim() || '';
+        if (!title) return this.showToast('Nama potongan wajib diisi.', 'error');
+        const codeError = utils.validateCode(code);
+        if (codeError) return this.showToast(codeError, 'error');
+        this.actionInProgress = true;
+        const button = document.getElementById('snippet-save-btn');
+        if (button) { button.disabled = true; button.textContent = 'Menyimpan...'; }
+        try {
+            const base = utils.sanitizeTitle(title) || `potongan-${Date.now()}`;
+            let id = existingId || base;
+            if (!existingId) { let n = 2; while (this.db.luaSnippets[id]) id = `${base}-${n++}`; }
+            const now = new Date().toISOString();
+            this.db.luaSnippets[id] = { id, name: title, description, code, created: this.db.luaSnippets[id]?.created || now, updated: now };
+            if (existingId && existingId !== id) delete this.db.luaSnippets[existingId];
+            await this.persistDatabase(`${existingId ? 'Perbarui' : 'Tambah'} potongan Lua: ${title}`);
+            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
+            this.showToast('Potongan Lua berhasil disimpan.', 'success');
+            this.resetSnippetEditor();
+            this.renderAdminList();
+        } catch (error) {
+            this.showToast(`Gagal menyimpan potongan: ${error.message}`, 'error');
+        } finally {
+            this.actionInProgress = false;
+            if (button) { button.disabled = false; button.textContent = existingId ? 'Perbarui Potongan' : 'Simpan Potongan'; }
+        }
+    },
+
+    async deleteLuaSnippet(encodedId) {
+        const id = decodeURIComponent(encodedId);
+        const item = this.db?.luaSnippets?.[id];
+        if (!item || this.actionInProgress) return;
+        let confirmed = false;
+        if (typeof Swal !== 'undefined') {
+            confirmed = (await Swal.fire({ title: 'Hapus potongan Lua?', text: `“${item.name}” akan dihapus dari pustaka.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', cancelButtonText: 'Batal', confirmButtonColor: '#ef4444' })).isConfirmed;
+        } else confirmed = confirm(`Hapus potongan “${item.name}”?`);
+        if (!confirmed) return;
+        this.actionInProgress = true;
+        try {
+            delete this.db.luaSnippets[id];
+            await this.persistDatabase(`Hapus potongan Lua: ${item.name}`);
+            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
+            this.showToast('Potongan Lua berhasil dihapus.', 'success');
+            this.resetSnippetEditor();
+            this.renderAdminList();
+        } catch (error) {
+            this.showToast(`Gagal menghapus potongan: ${error.message}`, 'error');
+        } finally { this.actionInProgress = false; }
+    },
+
+    openInsertLuaModal(editorId) {
+        this.insertTargetEditorId = editorId;
+        const modal = document.getElementById('lua-insert-modal');
+        if (!modal) return;
+        if (document.getElementById('insert-lua-search')) document.getElementById('insert-lua-search').value = '';
+        this.renderInsertLuaList();
+        modal.style.display = 'flex';
+        requestAnimationFrame(() => document.getElementById('insert-lua-search')?.focus());
+    },
+
+    closeInsertLuaModal() {
+        const modal = document.getElementById('lua-insert-modal');
+        if (modal) modal.style.display = 'none';
+        this.insertTargetEditorId = null;
+    },
+
+    renderInsertLuaList() {
+        const list = document.getElementById('insert-lua-list');
+        if (!list) return;
+        const query = (document.getElementById('insert-lua-search')?.value || '').trim().toLowerCase();
+        const items = Object.values(this.db?.luaSnippets || {}).filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query));
+        list.innerHTML = items.length ? items.map(item => `<button type="button" class="insert-lua-item" onclick="app.insertLuaSnippet('${encodeURIComponent(item.id)}')"><span class="insert-lua-item-icon">L</span><span><strong>${utils.escapeHtml(item.name)}</strong><small>${utils.escapeHtml(item.description || 'Tanpa deskripsi')}</small></span></button>`).join('') : `<div class="library-empty compact"><h4>${query ? 'Tidak ada hasil' : 'Belum ada potongan Lua'}</h4><p>Buat potongan dari tab Pustaka Lua terlebih dahulu.</p></div>`;
+    },
+
+    insertLuaSnippet(encodedId) {
+        const item = this.db?.luaSnippets?.[decodeURIComponent(encodedId)];
+        const editor = this.insertTargetEditorId ? this.pageEditors[this.insertTargetEditorId] : null;
+        if (!item || !editor) {
+            this.closeInsertLuaModal();
+            return this.showToast('Editor atau potongan Lua tidak ditemukan.', 'error');
+        }
+        editor.replaceSelection(item.code + (item.code.endsWith('\n') ? '' : '\n'));
+        editor.focus();
+        this.closeInsertLuaModal();
+        this.showToast(`“${item.name}” berhasil disisipkan.`, 'success');
+    },
+
     async renderAdminList() {
         if (!this.currentUser || !this.db) return;
         this.normalizeDatabase();
@@ -859,13 +1086,15 @@ const app = {
         const sorted = filtered.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
         const botsCount = Object.keys(this.db.bots || {}).length;
         const totalScripts = pages.reduce((sum, page) => sum + (page.scripts || []).length, 0);
-        document.getElementById('total-stats').textContent = `${pages.length} Pages · ${totalScripts} Scripts · ${botsCount} Bots`;
+        document.getElementById('total-stats').textContent = `${pages.length} page · ${totalScripts} script · ${botsCount} bot`; 
         const pageCountEl = document.getElementById('pages-count');
         const scriptCountEl = document.getElementById('scripts-count');
         if (pageCountEl) pageCountEl.textContent = pages.length;
         if (scriptCountEl) scriptCountEl.textContent = totalScripts;
         const publicPagesCountEl = document.getElementById('public-pages-count');
         if (publicPagesCountEl) publicPagesCountEl.textContent = pages.filter(page => page.visibility === 'PUBLIC').length;
+        const snippetsCountEl = document.getElementById('snippets-count');
+        if (snippetsCountEl) snippetsCountEl.textContent = Object.keys(this.db.luaSnippets || {}).length;
 
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-admin-state">
@@ -887,12 +1116,12 @@ const app = {
                         <div class="admin-meta">
                             <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
                             <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
-                            <span class="text-muted">Updated ${updated}</span>
+                            <span class="text-muted">Diperbarui ${updated}</span>
                         </div>
                     </div>
                 </div>
                 <div class="admin-item-actions">
-                    <button class="icon-btn danger" title="Delete page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
+                    <button class="icon-btn danger" title="Hapus page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
                     </button>
                     <span class="admin-open-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
@@ -909,15 +1138,15 @@ const app = {
         const sorted = bots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
         
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-admin-state"><p>No bots yet. Click "Create Bot" to add one.</p></div>`;
+            list.innerHTML = `<div class="empty-admin-state"><p>Belum ada bot. Tekan “Buat Bot” untuk menambahkan.</p></div>`;
             return;
         }
         
         list.innerHTML = sorted.map(b => {
-            let status = 'Pending', statusClass = 'status-pending', timeInfo = 'Pending';
-            if (b.cancelled) { status = 'Cancelled'; statusClass = 'status-cancelled'; } 
-            else if (b.sent) { status = 'Sent'; statusClass = 'status-sent'; timeInfo = `Sent: ${new Date(b.sentTime).toLocaleString()}`; } 
-            else if (b.scheduled) { status = 'Scheduled'; statusClass = 'status-scheduled'; timeInfo = `Scheduled: ${utils.formatDisplayTime(b.scheduledTime, b.timezone)}`; }
+            let status = 'Menunggu', statusClass = 'status-pending', timeInfo = 'Menunggu';
+            if (b.cancelled) { status = 'Dibatalkan'; statusClass = 'status-cancelled'; } 
+            else if (b.sent) { status = 'Terkirim'; statusClass = 'status-sent'; timeInfo = `Terkirim: ${new Date(b.sentTime).toLocaleString('id-ID')}`; } 
+            else if (b.scheduled) { status = 'Terjadwal'; statusClass = 'status-scheduled'; timeInfo = `Terjadwal: ${utils.formatDisplayTime(b.scheduledTime, b.timezone)}`; }
             
             return `<div class="admin-item" data-bot-id="${b.id}" onclick="app.populateBotEditor('${b.id}')">
                 <div class="admin-item-left">
@@ -994,7 +1223,7 @@ const app = {
 
     async deleteScriptConfirmation(scriptTitle) {
         if (!scriptTitle || !this.db.scripts[scriptTitle]) {
-            this.showToast('Script not found', 'error');
+            this.showToast('Script tidak ditemukan.', 'error');
             await this.loadDatabase();
             return;
         }
@@ -1002,17 +1231,17 @@ const app = {
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Delete Script',
-                text: `Are you sure you want to delete "${scriptTitle}"?`,
+                title: 'Hapus Script',
+                text: `Yakin ingin menghapus “${scriptTitle}”?`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Delete',
-                cancelButtonText: 'Cancel',
+                confirmButtonText: 'Hapus',
+                cancelButtonText: 'Batal',
                 confirmButtonColor: '#ef4444'
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Delete "${scriptTitle}"?`);
+            shouldDelete = confirm(`Yakin ingin menghapus “${scriptTitle}”?`);
         }
 
         if (shouldDelete) await this.deleteScriptLogic(scriptTitle);
@@ -1026,17 +1255,17 @@ const app = {
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Cancel Bot',
-                text: `Are you sure you want to cancel "${bot.title}"?`,
+                title: 'Batalkan Bot',
+                text: `Yakin ingin membatalkan “${bot.title}”?`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Cancel Bot',
-                cancelButtonText: 'Keep',
+                confirmButtonText: 'Batalkan Bot',
+                cancelButtonText: 'Tetap Simpan',
                 confirmButtonColor: '#ef4444'
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Cancel bot "${bot.title}"?`);
+            shouldDelete = confirm(`Yakin ingin membatalkan bot “${bot.title}”?`);
         }
 
         if (shouldDelete) await this.deleteBotLogic(botId);
@@ -1051,7 +1280,7 @@ const app = {
             if (typeof NProgress !== 'undefined') NProgress.start();
 
             const script = this.db.scripts[scriptTitle];
-            if (!script) throw new Error('Script not found');
+            if (!script) throw new Error('Script tidak ditemukan.');
 
             const scriptId = utils.sanitizeTitle(scriptTitle);
 
@@ -1088,7 +1317,7 @@ const app = {
                     const body = await dbRes.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Failed to update database — ${detail}`);
+                throw new Error(`Gagal memperbarui database — ${detail}`);
             }
 
             const newDbData = await dbRes.json();
@@ -1105,8 +1334,8 @@ const app = {
             await this.loadDatabase();
 
         } catch (e) {
-            console.error('Delete error:', e);
-            this.showToast(`Error: ${e.message}`, 'error');
+            console.error('Gagal menghapus:', e);
+            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1140,7 +1369,7 @@ const app = {
                     const body = await res.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Cannot read ${path} — ${detail}`);
+                throw new Error(`Gagal membaca ${path} — ${detail}.`);
             }
 
             const fileData = await res.json();
@@ -1166,7 +1395,7 @@ const app = {
                     const body = await deleteRes.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Cannot delete ${path} — ${detail}`);
+                throw new Error(`Gagal menghapus ${path} — ${detail}.`);
             }
         }
     },
@@ -1202,12 +1431,12 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Bot cancelled', 'success');
+                    this.showToast('Bot dibatalkan.', 'success');
                     await this.loadDatabase();
-                } else throw new Error('Failed to update database');
+                } else throw new Error('Gagal memperbarui database.');
             }
         } catch(e) {
-            this.showToast(`Error: ${e.message}`, 'error');
+            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1221,11 +1450,11 @@ const app = {
         this.originalPageId = null;
         this.destroyPageEditors();
         const heading = document.getElementById('editor-heading');
-        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
-        if (heading) heading.textContent = 'Create New Page';
-        if (saveBtn) saveBtn.textContent = 'Publish Page';
+        const saveBtn = document.getElementById('page-save-btn');
+        if (heading) heading.textContent = 'Buat Page Baru';
+        if (saveBtn) saveBtn.textContent = 'Terbitkan Page';
         const status = document.getElementById('page-editor-status');
-        if (status) status.textContent = 'Draft';
+        if (status) status.textContent = 'Draf';
         const title = document.getElementById('edit-title');
         const visibility = document.getElementById('edit-visibility');
         const desc = document.getElementById('edit-desc');
@@ -1265,11 +1494,16 @@ const app = {
                 </button>
             </div>
             <div class="script-editor-card-body">
+                <div class="script-editor-toolbar">
+                    <span class="editor-file-badge">.lua</span>
+                    <button class="btn btn-secondary btn-xs insert-lua-btn" type="button">Sisipkan Lua</button>
+                </div>
                 <div class="form-group">
-                    <label>Lua Source</label>
+                    <label>Kode Lua</label>
                     <textarea class="input-field page-code-textarea" data-editor-id="${editorId}">${utils.escapeHtml(code)}</textarea>
                 </div>
             </div>`;
+        card.querySelector('.insert-lua-btn').addEventListener('click', () => this.openInsertLuaModal(editorId));
         card.querySelector('.remove-script-btn').addEventListener('click', event => {
             event.stopPropagation();
             if (list.querySelectorAll('.script-editor-card').length <= 1) {
@@ -1296,7 +1530,7 @@ const app = {
             this.normalizeDatabase();
         }
         if (!this.db?.pages?.[title]) {
-            this.showToast('Page not found', 'error');
+            this.showToast('Page tidak ditemukan.', 'error');
             return;
         }
         const page = this.db.pages[title];
@@ -1306,11 +1540,11 @@ const app = {
         this.destroyPageEditors();
         this.switchAdminTab('create-edit');
         const heading = document.getElementById('editor-heading');
-        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
+        const saveBtn = document.getElementById('page-save-btn');
         const status = document.getElementById('page-editor-status');
         if (heading) heading.textContent = `Edit: ${page.title}`;
-        if (saveBtn) saveBtn.textContent = 'Update Page';
-        if (status) status.textContent = 'Editing';
+        if (saveBtn) saveBtn.textContent = 'Perbarui Page';
+        if (status) status.textContent = 'Mengedit';
         document.getElementById('edit-title').value = page.title || '';
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
         document.getElementById('edit-desc').value = page.description || '';
@@ -1338,14 +1572,14 @@ const app = {
     },
 
     resetBotEditor() {
-        document.getElementById('bot-editor-heading').textContent = 'Create New Bot';
+        document.getElementById('bot-editor-heading').textContent = 'Buat Bot Baru';
         document.getElementById('bot-title').value = '';
         document.getElementById('bot-message').value = '';
         document.getElementById('bot-schedule').checked = false;
         document.getElementById('bot-schedule-time').value = '';
         document.getElementById('bot-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const saveBtn = document.querySelector('.bot-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = 'Send Bot';
+        if (saveBtn) saveBtn.textContent = 'Kirim Bot';
         this.currentBotId = null;
         this.toggleScheduleFields();
     },
@@ -1355,7 +1589,7 @@ const app = {
         const bot = this.db.bots[botId];
         
         if (bot.sent) {
-            this.showToast('Cannot edit sent posts', 'error');
+            this.showToast('Posting yang sudah terkirim tidak dapat diedit.', 'error');
             this.switchAdminTab('bots');
             return;
         }
@@ -1376,27 +1610,40 @@ const app = {
         document.getElementById('bot-timezone').value = bot.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         const saveBtn = document.querySelector('.bot-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = bot.scheduled ? 'Update Schedule' : 'Send Now';
+        if (saveBtn) saveBtn.textContent = bot.scheduled ? 'Perbarui Jadwal' : 'Kirim Sekarang';
         this.toggleScheduleFields();
+    },
+
+    githubHeaders() {
+        return {
+            'Authorization': `Bearer ${this.token}`,
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2026-03-10',
+            'Content-Type': 'application/json'
+        };
+    },
+
+    explainGithubError(status, body = {}) {
+        const message = body?.message || '';
+        if (status === 401) return 'Token GitHub tidak valid, kedaluwarsa, atau tidak dapat digunakan.';
+        if (status === 403) return 'Akses GitHub ditolak. Pastikan token memiliki izin Contents: Read and write pada repository.';
+        if (status === 404) return 'Repository atau file tidak ditemukan. Periksa nama repository dan branch.';
+        if (status === 409) return 'Terjadi benturan perubahan di GitHub. Data terbaru akan dimuat ulang; coba terbitkan lagi.';
+        if (status === 422) return `GitHub menolak permintaan. ${message || 'Periksa isi data dan branch tujuan.'}`;
+        if (status >= 500) return `GitHub sedang bermasalah (HTTP ${status}). Coba lagi beberapa saat lagi.`;
+        return message ? `GitHub: ${message} (HTTP ${status}).` : `GitHub mengembalikan HTTP ${status}.`;
     },
 
     async getRemoteDatabaseSha() {
         const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json?ref=${encodeURIComponent(CONFIG.branch)}&t=${CONFIG.cacheBuster()}`;
         const res = await fetch(url, {
-            headers: {
-                'Authorization': `Bearer ${this.token}`,
-                'Accept': 'application/vnd.github+json',
-                'X-GitHub-Api-Version': '2026-03-10'
-            },
+            headers: this.githubHeaders(),
             cache: 'no-store'
         });
         if (!res.ok) {
-            let detail = `HTTP ${res.status}`;
-            try {
-                const body = await res.json();
-                if (body?.message) detail += `: ${body.message}`;
-            } catch (_) {}
-            throw new Error(`Failed to access remote database — ${detail}`);
+            let body = {};
+            try { body = await res.json(); } catch (_) {}
+            throw new Error(this.explainGithubError(res.status, body) + ' Database: database.json.');
         }
         const file = await res.json();
         return file.sha;
@@ -1407,16 +1654,24 @@ const app = {
     },
 
     async persistDatabase(message) {
-        if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
-        const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
+        // Always read the latest database SHA immediately before updating it.
+        // This prevents publishing failures caused by a stale browser-side SHA.
+        this.dbSha = await this.getRemoteDatabaseSha();
+        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`;
+        const dbRes = await fetch(url, {
             method: 'PUT',
-            headers: { 'Authorization': `token ${this.token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
-            body: JSON.stringify({ message, content: utils.safeBtoa(JSON.stringify(this.db, null, 2)), sha: this.dbSha, branch: CONFIG.branch })
+            headers: this.githubHeaders(),
+            body: JSON.stringify({
+                message,
+                content: utils.safeBtoa(JSON.stringify(this.db, null, 2)),
+                sha: this.dbSha,
+                branch: CONFIG.branch
+            })
         });
         if (!dbRes.ok) {
-            let detail = `HTTP ${dbRes.status}`;
-            try { const body = await dbRes.json(); if (body?.message) detail += `: ${body.message}`; } catch (_) {}
-            throw new Error(`Failed to update database — ${detail}`);
+            let body = {};
+            try { body = await dbRes.json(); } catch (_) {}
+            throw new Error(this.explainGithubError(dbRes.status, body));
         }
         const newDbData = await dbRes.json();
         this.dbSha = newDbData?.content?.sha || this.dbSha;
@@ -1424,43 +1679,45 @@ const app = {
 
     async savePage() {
         if (!this.currentUser || !this.db) {
-            this.showToast('Please login first.', 'error');
+            this.showToast('Silakan masuk terlebih dahulu.', 'error');
             return;
         }
         if (this.actionInProgress) return;
-        this.actionInProgress = true;
-        const titleInput = document.getElementById('edit-title');
-        const visibilityInput = document.getElementById('edit-visibility');
-        const descInput = document.getElementById('edit-desc');
-        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
-        const title = titleInput?.value.trim() || '';
-        const visibility = visibilityInput?.value || 'PUBLIC';
-        const desc = descInput?.value.trim() || '';
-        const scripts = this.collectEditorScripts();
+        const title = document.getElementById('edit-title')?.value.trim() || '';
+        const visibility = document.getElementById('edit-visibility')?.value || 'PUBLIC';
+        const desc = document.getElementById('edit-desc')?.value.trim() || '';
+        const saveBtn = document.getElementById('page-save-btn');
+        const collected = this.collectEditorScripts();
         const isEditing = !!this.currentEditingPageTitle;
         const oldPage = isEditing ? this.db.pages[this.currentEditingPageTitle] : null;
         const oldPageId = this.originalPageId || oldPage?.id || null;
         const pageId = utils.sanitizeTitle(title);
         const titleError = utils.validateTitle(title);
-
         try {
             if (titleError) throw new Error(titleError);
             if (!pageId) throw new Error('Judul page menghasilkan URL yang tidak valid.');
+            if (!collected.length) throw new Error('Tambahkan minimal 1 script ke dalam page.');
+            const duplicateIds = new Set();
+            const prepared = this.makeUniqueScriptIds(collected, oldPage);
+            for (const script of prepared) {
+                if (!script.name) throw new Error('Semua Nama Script wajib diisi.');
+                if (duplicateIds.has(script.id)) throw new Error(`Nama file script “${script.name}” bentrok. Ubah nama script.`);
+                duplicateIds.add(script.id);
+                const codeError = utils.validateCode(script.code);
+                if (codeError) throw new Error(`Script “${script.name}”: ${codeError}`);
+            }
             const pageExists = Object.entries(this.db.pages).some(([existingTitle, page]) => {
                 if (isEditing && existingTitle === this.currentEditingPageTitle) return false;
                 return (page.id || utils.sanitizeTitle(existingTitle)) === pageId;
             });
-            if (pageExists) throw new Error('Page ID sudah dipakai oleh page lain. Gunakan judul yang berbeda.');
-            if (!scripts.length) throw new Error('Tambahkan minimal 1 script ke dalam page.');
-            for (const script of scripts) {
-                if (!script.name) throw new Error('Semua Script Name wajib diisi.');
-                const codeError = utils.validateCode(script.code);
-                if (codeError) throw new Error(`Script "${script.name}": ${codeError}`);
-            }
+            if (pageExists) throw new Error('ID Page sudah dipakai. Gunakan judul yang berbeda.');
 
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Updating Page...' : 'Publishing Page...'; }
+            this.actionInProgress = true;
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Memperbarui...' : 'Menerbitkan...'; }
             if (typeof NProgress !== 'undefined') NProgress.start();
 
+            // Validate repository access before writing any generated files.
+            await this.getRemoteDatabaseSha();
             const now = new Date().toISOString();
             const pageData = {
                 id: pageId,
@@ -1468,37 +1725,39 @@ const app = {
                 displayTitle: title,
                 visibility,
                 description: desc,
-                scripts: scripts.map(script => ({
+                scripts: prepared.map(script => ({
                     id: script.id,
                     name: script.name,
                     filename: `${script.id}.lua`,
                     size: script.code.length,
-                    created: oldPage?.scripts?.find(item => item.id === script.oldId)?.created || now,
+                    created: oldPage?.scripts?.find(item => item.id === script.oldId || item.name === script.name)?.created || now,
                     updated: now
                 })),
                 created: oldPage?.created || now,
                 updated: now
             };
 
-            await this.createPageFiles(pageData, scripts, isEditing ? { ...oldPage, id: oldPageId } : null);
-            if (isEditing && this.currentEditingPageTitle !== title) delete this.db.pages[this.currentEditingPageTitle];
-            this.db.pages[title] = pageData;
+            await this.createPageFiles(pageData, prepared, isEditing ? { ...oldPage, id: oldPageId } : null);
+            const nextDb = JSON.parse(JSON.stringify(this.db));
+            if (isEditing && this.currentEditingPageTitle !== title) delete nextDb.pages[this.currentEditingPageTitle];
+            nextDb.pages[title] = pageData;
+            this.db = nextDb;
             this.normalizeDatabase();
-            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (storageError) { console.warn('Could not persist local database cache:', storageError); }
-            await this.persistDatabase(`${isEditing ? 'Update' : 'Add'} page: ${title}`);
+            await this.persistDatabase(`${isEditing ? 'Perbarui' : 'Terbitkan'} page: ${title}`);
+            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
 
             this.currentEditingPageTitle = title;
             this.originalTitle = title;
             this.originalPageId = pageId;
-            this.showToast(`${isEditing ? 'Updated' : 'Published'} page successfully!`, 'success');
+            this.showToast(isEditing ? 'Page berhasil diperbarui.' : 'Page berhasil diterbitkan.', 'success');
             this.renderList();
             this.renderAdminList();
-            if (document.getElementById('page-editor-status')) document.getElementById('page-editor-status').textContent = 'Saved';
-            if (document.getElementById('editor-heading')) document.getElementById('editor-heading').textContent = `Edit: ${title}`;
-            if (saveBtn) saveBtn.textContent = 'Update Page';
+            document.getElementById('page-editor-status') && (document.getElementById('page-editor-status').textContent = 'Tersimpan');
+            document.getElementById('editor-heading') && (document.getElementById('editor-heading').textContent = `Edit: ${title}`);
+            if (saveBtn) saveBtn.textContent = 'Perbarui Page';
         } catch (error) {
             console.error('Page save error:', error);
-            this.showToast(`Error: ${error.message}`, 'error');
+            this.showToast(`Gagal menerbitkan page: ${error.message}`, 'error');
         } finally {
             if (saveBtn) saveBtn.disabled = false;
             this.actionInProgress = false;
@@ -1509,34 +1768,27 @@ const app = {
     async createPageFiles(page, scripts, oldPage = null) {
         const oldScripts = oldPage?.scripts || [];
         const oldPageId = oldPage?.id || null;
-
+        const currentFiles = new Set((page.scripts || []).map(script => script.filename));
         if (oldPageId && oldPageId === page.id) {
-            const currentFiles = new Set((page.scripts || []).map(script => script.filename));
             for (const oldScript of oldScripts) {
-                if (!currentFiles.has(oldScript.filename)) {
-                    await this.deleteRemoteFile(`pages/${page.id}/raw/${oldScript.filename}`);
-                }
+                if (!currentFiles.has(oldScript.filename)) await this.deleteRemoteFile(`pages/${page.id}/raw/${oldScript.filename}`);
             }
         }
-
         for (const script of scripts) {
             await this.createOrUpdateFile(`pages/${page.id}/raw/${script.id}.lua`, script.code, 'text/plain');
         }
         await this.createOrUpdateFile(`pages/${page.id}/index.html`, this.generatePageViewerHTML(page), 'text/html');
-
-        if (oldPageId && oldPageId !== page.id) {
-            await this.deletePageFiles(oldPageId, oldScripts);
-        }
+        if (oldPageId && oldPageId !== page.id) await this.deletePageFiles(oldPageId, oldScripts);
     },
 
     async deleteRemoteFile(path) {
         const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' } });
+        const res = await fetch(url, { headers: this.githubHeaders(), cache: 'no-store' });
         if (res.status === 404) return;
-        if (!res.ok) throw new Error(`Cannot read ${path} — HTTP ${res.status}`);
+        if (!res.ok) { let body = {}; try { body = await res.json(); } catch (_) {} throw new Error(`${this.explainGithubError(res.status, body)} File: ${path}`); }
         const file = await res.json();
-        const del = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2026-03-10' }, body: JSON.stringify({ message: `Delete file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
-        if (!del.ok) throw new Error(`Cannot delete ${path} — HTTP ${del.status}`);
+        const del = await fetch(url, { method: 'DELETE', headers: this.githubHeaders(), body: JSON.stringify({ message: `Hapus file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
+        if (!del.ok) { let body = {}; try { body = await del.json(); } catch (_) {} throw new Error(`${this.explainGithubError(del.status, body)} File: ${path}`); }
     },
 
     safeJsonForScript(value) {
@@ -1583,7 +1835,7 @@ const app = {
                     <h1>${escapedTitle}</h1>
                     <div class="meta-row">
                         <span class="meta-badge">${(page.scripts || []).length} scripts</span>
-                        <span class="meta-badge">Updated ${created}</span>
+                        <span class="meta-badge">Diperbarui ${created}</span>
                     </div>
                 </div>
             </div>
@@ -1610,7 +1862,7 @@ const app = {
 
         function renderScripts() {
             tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
-            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Copy</button><button class="btn btn-sm" type="button" data-download="' + index + '">Download</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Loading...</code></pre></div></section>').join('');
+            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Salin</button><button class="btn btn-sm" type="button" data-download="' + index + '">Unduh</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Memuat...</code></pre></div></section>').join('');
 
             tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
                 const index = Number(tab.dataset.index);
@@ -1636,7 +1888,7 @@ const app = {
                     }
                 } catch (_) {
                     const block = document.getElementById('code-' + index);
-                    if (block) block.textContent = '-- Error loading source';
+                    if (block) block.textContent = '-- Gagal memuat source Lua';
                 }
             }));
         }
@@ -1646,7 +1898,7 @@ const app = {
                 const code = sourceCache[index] || '';
                 await navigator.clipboard.writeText(code);
                 const original = btn.textContent;
-                btn.textContent = 'Copied!';
+                btn.textContent = 'Tersalin';
                 setTimeout(() => btn.textContent = original, 1600);
             } catch (_) {}
         }
@@ -1672,39 +1924,26 @@ const app = {
 
     async createOrUpdateFile(path, content, contentType) {
         const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-        const getRes = await fetch(url, { headers: { 'Authorization': `token ${this.token}` } });
-        
+        const getRes = await fetch(url, { headers: this.githubHeaders(), cache: 'no-store' });
         let sha = null;
         if (getRes.ok) {
-            const existingFile = await getRes.json();
-            sha = existingFile.sha;
+            sha = (await getRes.json()).sha || null;
+        } else if (getRes.status !== 404) {
+            let body = {}; try { body = await getRes.json(); } catch (_) {}
+            throw new Error(`${this.explainGithubError(getRes.status, body)} File: ${path}`);
         }
-        
         const body = {
-            message: `Create/update ${path}`,
+            message: `Terbitkan ${path}`,
             content: utils.safeBtoa(content),
-            branch: CONFIG.branch
+            branch: CONFIG.branch,
+            ...(sha ? { sha } : {})
         };
-        if (sha) body.sha = sha;
-        
-        const putRes = await fetch(url, {
-            method: 'PUT',
-            headers: { 
-                'Authorization': `token ${this.token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-        
+        const putRes = await fetch(url, { method: 'PUT', headers: this.githubHeaders(), body: JSON.stringify(body) });
         if (!putRes.ok) {
-            let detail = `HTTP ${putRes.status}`;
-            try {
-                const errorBody = await putRes.json();
-                if (errorBody?.message) detail += `: ${errorBody.message}`;
-                if (errorBody?.documentation_url) detail += ` (${errorBody.documentation_url})`;
-            } catch (_) {}
-            throw new Error(`Failed to create/update file ${path} — ${detail}`);
+            let errorBody = {}; try { errorBody = await putRes.json(); } catch (_) {}
+            throw new Error(`${this.explainGithubError(putRes.status, errorBody)} File: ${path}`);
         }
+        return await putRes.json();
     },
 
     handleRouting() {

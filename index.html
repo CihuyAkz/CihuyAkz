@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-red-v4">
+    <link rel="stylesheet" href="style.css?v=20260925-admin-v3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -31,16 +31,16 @@
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
-                    <input type="text" id="search" placeholder="Search scripts..." aria-label="Search scripts">
+                    <input type="text" id="search" placeholder="Cari page atau script..." aria-label="Cari page atau script">
                 </div>
             </div>
 
             <div class="nav-right">
                 <div id="auth-section">
-                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Login</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Masuk</button>
                 </div>
                 <div id="user-section" style="display:none">
-                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
+                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Admin</button>
                 </div>
             </div>
         </div>
@@ -49,16 +49,16 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Login CihuyAkz</h3>
+                <h3>Masuk ke CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
-                    <label>GitHub Token</label>
-                    <input type="password" id="auth-token" class="input-field" placeholder="ghp_..." autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
+                    <label>Token GitHub</label>
+                    <input type="password" id="auth-token" class="input-field" placeholder="Masukkan token GitHub" autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
                 </div>
                 <div id="login-error" role="alert" aria-live="polite" style="color:var(--color-danger);font-size:13px;margin:16px 0;text-align:center;display:none"></div>
-                <button class="btn btn-full" onclick="app.login()">Login</button>
+                <button class="btn btn-full" onclick="app.login()">Masuk</button>
             </div>
         </div>
     </div>
@@ -68,27 +68,27 @@
             <div class="content-wrapper">
                 <aside class="sidebar">
                     <div class="sidebar-section">
-                        <h3 class="sidebar-title">Filters</h3>
+                        <h3 class="sidebar-title">Filter</h3>
                         <div class="sidebar-links">
                             <a href="#" class="sidebar-link active" data-filter="all" onclick="event.preventDefault(); app.filterCategory('all', event)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                                 </svg>
-                                All Scripts
+                                Semua Script
                             </a>
                             <a href="#" class="sidebar-link" data-filter="public" onclick="event.preventDefault(); app.filterCategory('public', event)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <circle cx="12" cy="12" r="10"></circle>
                                     <path d="M2 12h20"></path>
                                 </svg>
-                                Public
+                                Publik
                             </a>
                             <a href="#" class="sidebar-link" id="private-filter" style="display:none" data-filter="private" onclick="event.preventDefault(); app.filterCategory('private', event)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                     <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
                                     <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                                 </svg>
-                                Private
+                                Pribadi
                             </a>
                             <a href="#" class="sidebar-link" id="unlisted-filter" style="display:none" data-filter="unlisted" onclick="event.preventDefault(); app.filterCategory('unlisted', event)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -98,17 +98,17 @@
                                     <line x1="16" y1="17" x2="8" y2="17"></line>
                                     <polyline points="10 9 9 9 8 9"></polyline>
                                 </svg>
-                                Unlisted
+                                Tidak Terdaftar
                             </a>
                         </div>
                     </div>
                     <div class="sidebar-section sidebar-sort">
-                        <h3 class="sidebar-title">Sort By</h3>
+                        <h3 class="sidebar-title">Urutkan</h3>
                         <select class="input-field select-sm" id="sort-select" onchange="app.setSort(this.value)">
-                            <option value="newest">Newest First</option>
-                            <option value="oldest">Oldest First</option>
+                            <option value="newest">Terbaru</option>
+                            <option value="oldest">Terlama</option>
                             <option value="alpha">A-Z</option>
-                            <option value="updated">Recently Updated</option>
+                            <option value="updated">Baru Diperbarui</option>
                         </select>
                     </div>
                 </aside>
@@ -117,7 +117,7 @@
                     <div class="script-grid" id="script-list">
                         <div style="text-align:center;padding:60px 0;grid-column:1/-1">
                             <div class="spinner"></div>
-                            <p>Loading library...</p>
+                            <p>Memuat library...</p>
                         </div>
                     </div>
                 </main>
@@ -125,216 +125,131 @@
         </div>
 
         <div id="view-admin" class="view-section animate__animated animate__fadeIn" style="display:none">
-            <div class="admin-top-controls">
-                <button class="btn-back" onclick="navigate('')">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 12H5M12 19l-7-7 7-7"/>
-                    </svg>
-                    Back to Site
-                </button>
-                <button class="btn btn-secondary btn-sm" onclick="app.logout()">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
-                        <polyline points="16 17 21 12 16 7"></polyline>
-                        <line x1="21" y1="12" x2="9" y2="12"></line>
-                    </svg>
-                    Logout
-                </button>
+            <div class="admin-topbar">
+                <div class="admin-brand-block">
+                    <div class="admin-brand-mark">CA</div>
+                    <div>
+                        <span class="admin-breadcrumb">RUANG ADMIN</span>
+                        <h2>CihuyAkz Control Center</h2>
+                        <p>Kelola page, script Lua, dan bot dari satu panel.</p>
+                    </div>
+                </div>
+                <div class="admin-top-actions">
+                    <button class="btn-back" onclick="navigate('')">← Kembali ke Situs</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.logout()">Keluar</button>
+                </div>
             </div>
-            
-            <div class="admin-panel">
-                <div class="admin-header-flex">
-                    <h2>Admin Panel</h2>
-                    <div class="tab-switcher">
-                        <button class="tab-btn active" data-admin-tab="list" onclick="app.switchAdminTab('list')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            </svg>
-                            Manage
-                        </button>
-                        <button class="tab-btn" data-admin-tab="create" onclick="app.switchAdminTab('create')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            Add New
-                        </button>
-                        <button class="tab-btn" data-admin-tab="bots" onclick="app.switchAdminTab('bots')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <path d="M12 8v4l3 3"></path>
-                            </svg>
-                            Bots
-                        </button>
-                    </div>
-                </div>
 
-                <div id="admin-tab-editor" class="admin-tab" style="display:none">
-                    <div class="editor-container page-editor-shell">
-                        <div class="editor-title-row">
+            <div class="admin-shell">
+                <aside class="admin-sidebar">
+                    <div class="admin-user-card">
+                        <div class="admin-avatar">CA</div>
+                        <div><strong id="admin-user-name">Admin</strong><span>Terhubung ke GitHub</span></div>
+                    </div>
+                    <div class="admin-nav-label">PANEL</div>
+                    <div class="tab-switcher admin-nav">
+                        <button class="tab-btn active" data-admin-tab="list" onclick="app.switchAdminTab('list')"><span>01</span> Ringkasan Page</button>
+                        <button class="tab-btn" data-admin-tab="create" onclick="app.switchAdminTab('create')"><span>02</span> Buat Page</button>
+                        <button class="tab-btn" data-admin-tab="snippets" onclick="app.switchAdminTab('snippets')"><span>03</span> Pustaka Lua</button>
+                        <button class="tab-btn" data-admin-tab="bots" onclick="app.switchAdminTab('bots')"><span>04</span> Bot Discord</button>
+                    </div>
+                    <div class="admin-sidebar-tip">
+                        <span class="tip-dot"></span>
+                        <div><strong>Mode aman</strong><p>Pesan kritis dan kegagalan publish ditampilkan dalam Bahasa Indonesia.</p></div>
+                    </div>
+                </aside>
+
+                <main class="admin-main-panel">
+                    <div id="admin-tab-list" class="admin-tab" style="display:block">
+                        <div class="admin-hero-card">
                             <div>
-                                <div class="eyebrow">PAGE BUILDER</div>
-                                <h3 id="editor-heading">Create New Page</h3>
-                                <p class="editor-subtitle">Buat satu halaman yang bisa berisi banyak script Lua.</p>
+                                <span class="admin-kicker">DASHBOARD</span>
+                                <h3>Kelola semua konten di satu tempat.</h3>
+                                <p>Page dapat memuat banyak script Lua, dan potongan Lua yang sering dipakai bisa disisipkan tanpa copy-paste berulang.</p>
                             </div>
-                            <span class="editor-status" id="page-editor-status">Draft</span>
+                            <button class="btn btn-primary" onclick="app.switchAdminTab('create')">+ Buat Page Baru</button>
                         </div>
+                        <div class="admin-stats-grid">
+                            <div class="stat-card stat-card-large"><span class="stat-label">PAGE</span><strong id="pages-count">0</strong><span class="stat-hint">Total page</span></div>
+                            <div class="stat-card"><span class="stat-label">SCRIPT</span><strong id="scripts-count">0</strong><span class="stat-hint">Semua script di dalam page</span></div>
+                            <div class="stat-card"><span class="stat-label">PUBLIC</span><strong id="public-pages-count">0</strong><span class="stat-hint">Page yang bisa dibuka publik</span></div>
+                            <div class="stat-card"><span class="stat-label">LUA</span><strong id="snippets-count">0</strong><span class="stat-hint">Potongan siap sisip</span></div>
+                        </div>
+                        <div class="admin-content-card">
+                            <div class="admin-list-header admin-list-header-modern">
+                                <div><span class="admin-kicker">KONTEN</span><h3>Daftar Page</h3><span id="total-stats">Memuat...</span></div>
+                                <div class="admin-list-search"><span>⌕</span><input id="admin-page-search" type="search" placeholder="Cari page atau script..." oninput="app.setAdminSearch(this.value)"></div>
+                            </div>
+                            <div id="admin-list"></div>
+                        </div>
+                    </div>
 
-                        <div class="page-settings-card">
-                            <div class="section-heading">
-                                <div>
-                                    <h4>Informasi Page</h4>
-                                    <p>Judul page tampil sebagai nama utama di library.</p>
+                    <div id="admin-tab-editor" class="admin-tab" style="display:none">
+                        <div class="editor-container page-editor-shell admin-content-card">
+                            <div class="editor-title-row">
+                                <div><span class="admin-kicker">PAGE BUILDER</span><h3 id="editor-heading">Buat Page Baru</h3><p class="editor-subtitle">Satu judul page dapat memiliki banyak Nama Script.</p></div>
+                                <span class="editor-status" id="page-editor-status">Draf</span>
+                            </div>
+                            <div class="page-settings-card">
+                                <div class="section-heading"><div><h4>Informasi Page</h4><p>Judul ini menjadi halaman utama yang dibuka pengunjung.</p></div><span class="section-number">01</span></div>
+                                <div class="form-row">
+                                    <div class="form-group form-group-flex"><label>Judul Page</label><input type="text" id="edit-title" class="input-field" placeholder="Contoh: Ultimate Tools Pack"></div>
+                                    <div class="form-group"><label>Visibilitas</label><select id="edit-visibility" class="input-field"><option value="PUBLIC">Publik</option><option value="PRIVATE">Pribadi</option><option value="UNLISTED">Tidak Terdaftar</option></select></div>
                                 </div>
-                                <span class="section-number">01</span>
+                                <div class="form-group"><label>Deskripsi</label><textarea id="edit-desc" class="input-field" rows="3" placeholder="Deskripsi singkat page ini..."></textarea></div>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group form-group-flex">
-                                    <label>Judul Page</label>
-                                    <input type="text" id="edit-title" class="input-field" placeholder="e.g. Ultimate Tools Pack">
-                                </div>
-                                <div class="form-group">
-                                    <label>Visibility</label>
-                                    <select id="edit-visibility" class="input-field">
-                                        <option value="PUBLIC">Public</option>
-                                        <option value="PRIVATE">Private</option>
-                                        <option value="UNLISTED">Unlisted</option>
-                                    </select>
-                                </div>
+                            <div class="scripts-builder-card">
+                                <div class="section-heading scripts-section-heading"><div><h4>Script di dalam Page</h4><p>Setiap kartu punya <strong>Nama Script</strong> dan editor Lua sendiri.</p></div><button class="btn btn-secondary btn-sm" onclick="app.addScriptEditor()">+ Tambah Script</button></div>
+                                <div id="script-editor-list" class="script-editor-list"></div>
                             </div>
-                            <div class="form-group">
-                                <label>Description</label>
-                                <textarea id="edit-desc" class="input-field" rows="4" placeholder="Deskripsi singkat untuk page ini..."></textarea>
+                            <div class="editor-actions">
+                                <div class="action-note"><span class="dot"></span><span id="script-editor-count">0 script</span></div>
+                                <div class="action-buttons"><button class="btn btn-secondary" onclick="app.switchAdminTab('list')">Batal</button><button id="page-save-btn" class="btn btn-primary" onclick="app.savePage()">Terbitkan Page</button></div>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="scripts-builder-card">
-                            <div class="section-heading scripts-section-heading">
-                                <div>
-                                    <h4>Scripts di dalam Page</h4>
-                                    <p>Setiap item punya <strong>Script Name</strong> sendiri. Tambahkan sebanyak yang diperlukan.</p>
-                                </div>
-                                <button class="btn btn-secondary btn-sm" onclick="app.addScriptEditor()">
-                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                                    Tambah Script
-                                </button>
-                            </div>
-                            <div id="script-editor-list" class="script-editor-list"></div>
+                    <div id="admin-tab-snippets" class="admin-tab" style="display:none">
+                        <div class="snippet-layout">
+                            <section class="admin-content-card snippet-editor-card">
+                                <div class="editor-title-row"><div><span class="admin-kicker">PUSTAKA LUA</span><h3 id="snippet-editor-heading">Tambah Potongan Lua</h3><p class="editor-subtitle">Simpan bagian kode yang sering digunakan agar bisa disisipkan sekali klik.</p></div></div>
+                                <input type="hidden" id="snippet-id">
+                                <div class="form-group"><label>Nama Potongan</label><input type="text" id="snippet-title" class="input-field" placeholder="Contoh: Loader Dasar"></div>
+                                <div class="form-group"><label>Deskripsi</label><input type="text" id="snippet-desc" class="input-field" placeholder="Kegunaan potongan ini"></div>
+                                <div class="form-group"><label>Kode Lua</label><textarea id="snippet-code" class="input-field snippet-code-input" rows="15" placeholder="Tempel atau tulis kode Lua yang sering dipakai..."></textarea></div>
+                                <div class="action-buttons"><button class="btn btn-secondary" onclick="app.resetSnippetEditor()">Kosongkan</button><button id="snippet-save-btn" class="btn btn-primary" onclick="app.saveLuaSnippet()">Simpan Potongan</button></div>
+                            </section>
+                            <section class="admin-content-card snippet-library-card">
+                                <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">KODE SIAP PAKAI</span><h3>Potongan Lua</h3><span>Bisa disisipkan langsung dari editor Page.</span></div><div class="admin-list-search"><span>⌕</span><input id="snippet-search" type="search" placeholder="Cari potongan..." oninput="app.renderLuaLibrary()"></div></div>
+                                <div id="lua-snippet-list" class="lua-snippet-list"></div>
+                            </section>
                         </div>
+                    </div>
 
-                        <div class="editor-actions">
-                            <div class="action-note">
-                                <span class="dot"></span>
-                                <span id="script-editor-count">0 script</span>
-                            </div>
-                            <div class="action-buttons">
-                                <button class="btn btn-secondary" onclick="app.switchAdminTab('list')">Cancel</button>
-                                <button class="btn" onclick="app.savePage()">Publish Page</button>
-                            </div>
+                    <div id="admin-tab-bots" class="admin-tab" style="display:none">
+                        <div class="admin-content-card">
+                            <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">AUTOMASI</span><h3>Bot Discord</h3><span>Atur posting manual atau terjadwal.</span></div><button class="btn btn-primary btn-sm" onclick="app.switchAdminTab('create-bot')">+ Buat Bot</button></div>
+                            <div id="bots-list"></div>
                         </div>
                     </div>
-                </div>
 
-                <div id="admin-tab-list" class="admin-tab" style="display:block">
-                    <div class="admin-dashboard-head">
-                        <div>
-                            <div class="eyebrow">CONTENT CONTROL</div>
-                            <h3>Pages & Scripts</h3>
-                            <p>Kelola semua page dan script dari satu tempat.</p>
-                        </div>
-                        <button class="btn" onclick="app.switchAdminTab('create')">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="19"></line></svg>
-                            New Page
-                        </button>
-                    </div>
-                    <div class="admin-stats-grid">
-                        <div class="stat-card stat-card-accent">
-                            <span class="stat-label">PAGES</span>
-                            <strong id="pages-count">0</strong>
-                            <span class="stat-hint">Published pages</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">SCRIPTS</span>
-                            <strong id="scripts-count">0</strong>
-                            <span class="stat-hint">Total script items</span>
-                        </div>
-                        <div class="stat-card">
-                            <span class="stat-label">PUBLIC</span>
-                            <strong id="public-pages-count">0</strong>
-                            <span class="stat-hint">Public pages</span>
+                    <div id="admin-tab-bot-editor" class="admin-tab" style="display:none">
+                        <div class="admin-content-card bot-form-container">
+                            <div class="editor-title-row"><div><span class="admin-kicker">BOT DISCORD</span><h3 id="bot-editor-heading">Buat Bot Baru</h3></div></div>
+                            <div class="form-group"><label>Judul Post</label><input type="text" id="bot-title" class="input-field" placeholder="Judul thread untuk Discord"></div>
+                            <div class="form-group"><label>Isi Pesan</label><textarea id="bot-message" class="input-field" rows="5" placeholder="Pesan yang akan dikirim ke Discord"></textarea></div>
+                            <div class="form-group"><label class="checkbox-row"><input type="checkbox" id="bot-schedule" onchange="app.toggleScheduleFields()"> Jadwalkan post</label></div>
+                            <div id="schedule-fields" class="schedule-fields"><div class="form-group"><label>Waktu Kirim</label><input type="datetime-local" id="bot-schedule-time" class="input-field"></div><div class="form-group"><label>Zona Waktu</label><select id="bot-timezone" class="input-field"><option value="UTC">UTC</option><option value="Asia/Jakarta">WIB — Jakarta</option><option value="Asia/Tokyo">JST — Tokyo</option><option value="Europe/London">GMT — London</option></select></div></div>
+                            <div class="bot-actions"><div class="action-buttons"><button class="btn btn-secondary" onclick="app.switchAdminTab('bots')">Batal</button><button class="btn btn-primary" onclick="app.saveBot()">Kirim Bot</button></div></div>
                         </div>
                     </div>
-                    <div class="admin-list-header">
-                        <div>
-                            <h3>Existing Pages</h3>
-                            <span id="total-stats">Loading...</span>
-                        </div>
-                        <div class="admin-list-search">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
-                            <input id="admin-page-search" type="search" placeholder="Search pages..." oninput="app.setAdminSearch(this.value)">
-                        </div>
-                    </div>
-                    <div id="admin-list"></div>
-                </div>
+                </main>
+            </div>
 
-                <div id="admin-tab-bots" class="admin-tab" style="display:none">
-                    <div class="admin-list-header">
-                        <h3>Bot Posts</h3>
-                        <button class="btn btn-sm" onclick="app.switchAdminTab('create-bot')">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            Create Bot
-                        </button>
-                    </div>
-                    <div id="bots-list"></div>
-                </div>
-
-                <div id="admin-tab-bot-editor" class="admin-tab" style="display:none">
-                    <div class="bot-form-container">
-                        <h3 id="bot-editor-heading">Create New Bot</h3>
-                        <div class="form-group">
-                            <label>Post Title</label>
-                            <input type="text" id="bot-title" class="input-field" placeholder="Thread title for Discord">
-                        </div>
-                        <div class="form-group">
-                            <label>Message Content</label>
-                            <textarea id="bot-message" class="input-field" rows="4" placeholder="Message to send to Discord"></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="bot-schedule" onchange="app.toggleScheduleFields()">
-                                Schedule Post
-                            </label>
-                        </div>
-                        <div id="schedule-fields" class="schedule-fields">
-                            <div class="form-group">
-                                <label>Scheduled Time</label>
-                                <input type="datetime-local" id="bot-schedule-time" class="input-field">
-                            </div>
-                            <div class="form-group">
-                                <label>Timezone</label>
-                                <select id="bot-timezone" class="input-field">
-                                    <option value="UTC">UTC</option>
-                                    <option value="America/New_York">Eastern Time (ET)</option>
-                                    <option value="America/Chicago">Central Time (CT)</option>
-                                    <option value="America/Denver">Mountain Time (MT)</option>
-                                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                                    <option value="Europe/London">London (GMT)</option>
-                                    <option value="Europe/Paris">Paris (CET)</option>
-                                    <option value="Asia/Tokyo">Tokyo (JST)</option>
-                                    <option value="Australia/Sydney">Sydney (AEST)</option>
-                                </select>
-                            </div>
-                        </div>
-                        <div class="bot-actions">
-                            <div class="action-buttons">
-                                <button class="btn btn-secondary" onclick="app.switchAdminTab('bots')">Cancel</button>
-                                <button class="btn" onclick="app.saveBot()">Send Bot</button>
-                            </div>
-                        </div>
-                    </div>
+            <div id="lua-insert-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this) app.closeInsertLuaModal()">
+                <div class="modal lua-insert-modal">
+                    <div class="modal-header"><div><span class="admin-kicker">SISIPKAN</span><h3>Pilih Potongan Lua</h3></div><button class="close-btn" onclick="app.closeInsertLuaModal()">×</button></div>
+                    <div class="modal-body"><div class="admin-list-search modal-search"><span>⌕</span><input id="insert-lua-search" type="search" placeholder="Cari potongan..." oninput="app.renderInsertLuaList()"></div><div id="insert-lua-list" class="insert-lua-list"></div></div>
                 </div>
             </div>
         </div>
@@ -345,6 +260,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260925-page-builder"></script>
+    <script src="app.js?v=20260925-admin-v3"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>
