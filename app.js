@@ -232,32 +232,13 @@ const app = {
         }
     },
 
-    toggleSuggestionModal() {
-        const modal = document.getElementById('suggestion-modal');
-        if (!modal) return;
-        modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
-        if (modal.style.display === 'flex') {
-            const title = document.getElementById('suggestion-title');
-            if (title) title.focus();
-        }
-    },
-
-    submitSuggestion() {
-        const titleEl = document.getElementById('suggestion-title');
-        const bodyEl = document.getElementById('suggestion-body');
-        const title = (titleEl?.value || '').trim();
-        const body = (bodyEl?.value || '').trim();
-        if (!title || !body) {
-            this.showToast('Judul dan isi suggestion wajib diisi.', 'error');
-            return;
-        }
-        const issueTitle = `[Suggestion] ${title}`;
-        const issueBody = `${body}\n\n---\nSent from CihuyAkz Studio Lite`;
-        const url = `https://github.com/${CONFIG.repoOwner}/${CONFIG.repo}/issues/new?title=${encodeURIComponent(issueTitle)}&body=${encodeURIComponent(issueBody)}&labels=suggestion`;
-        window.open(url, '_blank', 'noopener,noreferrer');
-        this.toggleSuggestionModal();
-        if (titleEl) titleEl.value = '';
-        if (bodyEl) bodyEl.value = '';
+    openSuggestionBoard() {
+        const board = document.getElementById('suggestion-board');
+        if (!board) return;
+        board.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        window.setTimeout(() => {
+            if (typeof window.loadSuggestionGiscus === 'function') window.loadSuggestionGiscus();
+        }, 250);
     },
 
     async login() {
@@ -1380,12 +1361,13 @@ const app = {
         <div class="community-panel">
             <div class="community-heading">
                 <div>
-                    <h2>Community</h2>
-                    <p>Like, dislike, komentar, dan reply tersimpan lewat GitHub Discussions.</p>
+                    <span class="section-kicker">SCRIPT COMMUNITY</span>
+                    <h2>Comments & Reactions</h2>
+                    <p>Gunakan 👍 Like atau 👎 Dislike di bagian reaction, lalu tulis komentar dan balas komentar lain.</p>
                 </div>
                 <button class="btn btn-danger-outline btn-sm" onclick="reportScript()">⚑ Report</button>
             </div>
-            <div class="reaction-hint">👍 Like &nbsp; 👎 Dislike &nbsp; 💬 Komentar &amp; Reply</div>
+            <div class="reaction-hint"><span>👍 Like</span><span>👎 Dislike</span><span>💬 Comment</span><span>↩ Reply</span></div>
             <div class="giscus" id="giscus-comments"></div>
         </div>
     </div>
@@ -1417,12 +1399,12 @@ const app = {
                 strict: '0',
                 reactionsEnabled: '1',
                 emitMetadata: '0',
-                inputPosition: 'bottom',
+                inputPosition: 'top',
                 theme: base.theme || 'dark',
                 lang: base.lang || 'id'
             };
             if (!cfg.repoId || !cfg.categoryId) {
-                document.getElementById('giscus-comments').innerHTML = '<div class="community-setup"><strong>Community belum diaktifkan.</strong><br>Owner perlu mengaktifkan GitHub Discussions dan mengisi Repo ID + Category ID dari giscus.app.</div>';
+                document.getElementById('giscus-comments').innerHTML = '<div class="community-setup"><strong>Comments belum terhubung.</strong><br>Isi Repo ID dan Category ID di <code>community-config.js</code>, lalu deploy ulang.</div>';
                 return;
             }
             const script = document.createElement('script');

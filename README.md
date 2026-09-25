@@ -19,16 +19,17 @@ Website untuk menyimpan dan mengelola script Roblox Studio Lite / Roblox Studio.
 
 
 ### Community features
-- Tombol utama `Login` diganti nama menjadi `Manage`; akses tetap dibatasi ke akun GitHub `CihuyAkz`.
-- `Suggestion` membuka GitHub Issue terprefill agar saran dapat dikelola owner.
-- Setiap halaman script memiliki `Report` yang membuka issue terprefill dengan label `bug`.
-- Komentar, reply, Like, dan Dislike disiapkan melalui giscus/GitHub Discussions. Sebelum aktif, owner perlu mengaktifkan Discussions dan mengisi `repoId` serta `categoryId` dari giscus.app pada `app.js`.
 
+- Tombol `Login` diganti nama menjadi `Manage`; akses tetap dibatasi ke akun GitHub `CihuyAkz`.
+- `Suggestion` sekarang membuka `Suggestion Board` langsung di website. Saran ditulis sebagai komentar di GitHub Discussions, bukan GitHub Issues.
+- Setiap halaman script memiliki `Report` yang tetap membuka issue bug terprefill.
+- Komentar, reply, dan reactions untuk setiap script menggunakan giscus/GitHub Discussions.
 
-### Aktivasi komentar / Like / Dislike
-1. Aktifkan **Discussions** pada repository `CihuyAkz/CihuyAkz`.
-2. Buka giscus.app, pilih repository tersebut, lalu pilih category `General`.
-3. Salin `Repository ID` dan `Category ID` ke `community-config.js`.
-4. Setelah itu halaman script akan memakai GitHub Discussions untuk komentar, reply, dan reactions (termasuk Like/Dislike).
+### Aktivasi komentar / Like / Dislike / Suggestion Board
 
-`Suggestion` dan `Report` tidak membutuhkan token pengunjung; keduanya membuka form GitHub Issue yang sudah diisi otomatis.
+1. Pastikan GitHub Discussions aktif pada repository `CihuyAkz/CihuyAkz`. Giscus membutuhkan repository publik, Discussions aktif, dan aplikasi giscus terpasang agar pengunjung dapat melihat serta memposting komentar/reactions.
+2. Buka giscus.app, pilih repository `CihuyAkz/CihuyAkz`, lalu pilih kategori yang dipakai untuk komentar script (misalnya `General`) dan kategori `Ideas` untuk Suggestion Board.
+3. Salin `Repository ID` dan `Category ID` ke `community-config.js`. Untuk Suggestion Board isi `suggestionCategoryId` sesuai kategori `Ideas`.
+4. Deploy ulang. Setelah terhubung, halaman script menampilkan komentar/reply dan reactions GitHub, sedangkan tombol `Suggestion` membuka board saran langsung di website.
+
+`Report` tetap memakai GitHub Issues karena fungsinya khusus untuk laporan bug/masalah teknis.
