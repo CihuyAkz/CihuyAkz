@@ -443,7 +443,7 @@ const app = {
             if (list) {
                 list.innerHTML = `<div class="empty-admin-state">
                     <p style="color:var(--color-danger)">Terjadi kesalahan: ${e.message}</p>
-                    <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Retry</button>
+                    <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Coba Lagi</button>
                 </div>`;
             }
             this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
@@ -742,8 +742,8 @@ const app = {
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
                 <div class="empty-state-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                <h2>No pages found</h2>
-                <p>Try adjusting your search or filter</p>
+                <h2>Page tidak ditemukan</h2>
+                <p>Coba ubah pencarian atau filter yang digunakan.</p>
             </div>`;
             return;
         }
@@ -752,7 +752,7 @@ const app = {
             const pageId = page.id || utils.sanitizeTitle(page.title);
             const scriptsCount = Array.isArray(page.scripts) ? page.scripts.length : 0;
             const scriptNames = (page.scripts || []).slice(0, 3).map(script => utils.escapeHtml(script.name || '')).join(' · ');
-            const pagePath = page.legacy ? `scripts/${encodeURIComponent(pageId)}/index.html` : `pages/${encodeURIComponent(pageId)}/index.html`;
+            const pagePath = `${CONFIG.pagesBaseUrl()}?page=${encodeURIComponent(pageId)}`;
             return `<article class="script-card page-card" onclick="window.location.href='${pagePath}'">
                 <div class="card-glow"></div>
                 <div class="card-content">
@@ -767,7 +767,7 @@ const app = {
                     <div class="page-script-preview">${scriptNames || 'Belum ada script.'}</div>
                     <div class="card-meta">
                         <span>${scriptsCount} script</span>
-                        <span class="page-open">Open <span>→</span></span>
+                        <span class="page-open">Buka <span>→</span></span>
                     </div>
                 </div>
             </article>`;
@@ -964,7 +964,7 @@ const app = {
             list.innerHTML = `<div class="library-empty"><div class="library-empty-icon">LUA</div><h4>${query ? 'Potongan tidak ditemukan' : 'Belum ada potongan Lua'}</h4><p>Simpan kode yang sering dipakai sekali, lalu sisipkan ke script mana pun.</p></div>`;
             return;
         }
-        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Potongan Lua siap digunakan.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Edit</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Hapus</button></div></article>`).join('');
+        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Potongan Lua siap digunakan.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Ubah</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Hapus</button></div></article>`).join('');
     },
 
     editLuaSnippet(encodedId) {
@@ -1099,7 +1099,7 @@ const app = {
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-admin-state">
                 <div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                <p>${query ? 'Tidak ada page yang cocok dengan pencarian.' : 'Belum ada page. Klik “New Page” untuk membuat page pertama.'}</p>
+                <p>${query ? 'Tidak ada page yang cocok dengan pencarian.' : 'Belum ada page. Klik “Buat Page Baru” untuk membuat page pertama.'}</p>
             </div>`;
             return;
         }
@@ -1159,7 +1159,7 @@ const app = {
                 <div class="admin-item-right">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
-                <div class="swipe-hint">Swipe to cancel</div>
+                <div class="swipe-hint">Geser untuk membatalkan</div>
             </div>`;
         }).join('');
         this.initSwipeToDelete();
@@ -1330,7 +1330,7 @@ const app = {
                 console.warn('Could not persist local database cache:', storageError);
             }
 
-            this.showToast('Script deleted', 'success');
+            this.showToast('Script berhasil dihapus.', 'success');
             await this.loadDatabase();
 
         } catch (e) {
@@ -1470,7 +1470,7 @@ const app = {
         const list = document.getElementById('script-editor-list');
         const countEl = document.getElementById('script-editor-count');
         const count = list ? list.querySelectorAll('.script-editor-card').length : 0;
-        if (countEl) countEl.textContent = `${count} script${count === 1 ? '' : 's'}`;
+        if (countEl) countEl.textContent = `${count} script${''}`;
     },
 
     addScriptEditor(script = null, code = '') {
@@ -1822,7 +1822,7 @@ const app = {
                 </a>
             </div>
             <div class="nav-right">
-                <a href="../../index.html" class="btn btn-secondary btn-sm">Back</a>
+                <a href="../../index.html" class="btn btn-secondary btn-sm">Kembali</a>
             </div>
         </div>
     </nav>
@@ -1831,10 +1831,10 @@ const app = {
         <section id="script-content" class="script-page-content">
             <div class="script-header-lg page-hero-header">
                 <div>
-                    <span class="page-kicker">SCRIPT PAGE</span>
+                    <span class="page-kicker">HALAMAN SCRIPT</span>
                     <h1>${escapedTitle}</h1>
                     <div class="meta-row">
-                        <span class="meta-badge">${(page.scripts || []).length} scripts</span>
+                        <span class="meta-badge">${(page.scripts || []).length} script</span>
                         <span class="meta-badge">Diperbarui ${created}</span>
                     </div>
                 </div>
@@ -1862,7 +1862,7 @@ const app = {
 
         function renderScripts() {
             tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
-            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Salin</button><button class="btn btn-sm" type="button" data-download="' + index + '">Unduh</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Memuat...</code></pre></div></section>').join('');
+            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Salin</button><button class="btn btn-sm" type="button" data-download="' + index + '">Unduh</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Kode Asli</a></div></div><pre><code id="code-' + index + '" class="language-lua">Memuat...</code></pre></div></section>').join('');
 
             tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
                 const index = Number(tab.dataset.index);
@@ -1888,7 +1888,7 @@ const app = {
                     }
                 } catch (_) {
                     const block = document.getElementById('code-' + index);
-                    if (block) block.textContent = '-- Gagal memuat source Lua';
+                    if (block) block.textContent = '-- Kode Lua gagal dimuat.';
                 }
             }));
         }
@@ -1946,22 +1946,164 @@ const app = {
         return await putRes.json();
     },
 
+    getPageById(pageId) {
+        this.normalizeDatabase();
+        const id = String(pageId || '').trim();
+        if (!id) return null;
+        return Object.values(this.db.pages || {}).find(page => (page.id || utils.sanitizeTitle(page.title)) === id) || null;
+    },
+
+    async renderPageViewer(pageId) {
+        const view = document.getElementById('view-page');
+        const content = document.getElementById('page-view-content');
+        if (!view || !content) return;
+
+        let page = this.getPageById(pageId);
+        if (!page) {
+            try {
+                const freshRes = await fetch(`database.json?t=${CONFIG.cacheBuster()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
+                if (freshRes.ok) {
+                    this.db = await freshRes.json();
+                    this.normalizeDatabase();
+                    try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
+                    page = this.getPageById(pageId);
+                }
+            } catch (error) {
+                console.warn('Gagal memperbarui database saat membuka page:', error);
+            }
+        }
+        if (!page) {
+            content.innerHTML = `
+                <div class="empty-state page-not-found-state">
+                    <div class="empty-state-icon">?</div>
+                    <h2>Page tidak ditemukan</h2>
+                    <p>Page yang kamu buka belum tersedia atau sudah dihapus.</p>
+                    <button class="btn btn-primary" type="button" onclick="navigate('')">Kembali ke Situs</button>
+                </div>`;
+            return;
+        }
+
+        const scripts = Array.isArray(page.scripts) ? page.scripts : [];
+        const pageIdSafe = page.id || utils.sanitizeTitle(page.title);
+        const folder = page.legacy ? 'scripts' : 'pages';
+        const rawBase = `${CONFIG.pagesBaseUrl()}${folder}/${encodeURIComponent(pageIdSafe)}/raw/`;
+        const created = new Date(page.updated || page.created || Date.now()).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
+
+        content.innerHTML = `
+            <div class="script-header-lg page-hero-header">
+                <div>
+                    <span class="page-kicker">HALAMAN SCRIPT</span>
+                    <h1>${utils.escapeHtml(page.title)}</h1>
+                    <div class="meta-row">
+                        <span class="meta-badge">${scripts.length} script</span>
+                        <span class="meta-badge">Diperbarui ${created}</span>
+                    </div>
+                </div>
+            </div>
+            ${description}
+            ${scripts.length ? `
+                <div id="page-script-tabs" class="page-script-tabs"></div>
+                <div id="page-script-panels" class="page-script-panels"></div>` : `
+                <div class="empty-state"><h2>Belum ada script</h2><p>Page ini belum memiliki script yang dapat ditampilkan.</p></div>`}`;
+
+        if (!scripts.length) return;
+
+        const tabs = document.getElementById('page-script-tabs');
+        const panels = document.getElementById('page-script-panels');
+        const sourceCache = {};
+        tabs.innerHTML = scripts.map((script, index) => `<button class="page-script-tab${index === 0 ? ' active' : ''}" data-index="${index}" type="button">${utils.escapeHtml(script.name || `Script ${index + 1}`)}</button>`).join('');
+        panels.innerHTML = scripts.map((script, index) => {
+            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
+            return `<section class="page-script-panel${index === 0 ? ' active' : ''}" data-panel="${index}">
+                <div class="code-box">
+                    <div class="toolbar">
+                        <div class="file-info">${utils.escapeHtml(filename)}</div>
+                        <div class="toolbar-right">
+                            <button class="btn btn-sm" type="button" data-copy="${index}">Salin</button>
+                            <button class="btn btn-sm" type="button" data-download="${index}">Unduh</button>
+                            <a href="${rawBase}${encodeURIComponent(filename)}" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Kode Asli</a>
+                        </div>
+                    </div>
+                    <pre><code id="page-code-${index}" class="language-lua">Memuat...</code></pre>
+                </div>
+            </section>`;
+        }).join('');
+
+        tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
+            const index = Number(tab.dataset.index);
+            tabs.querySelectorAll('.page-script-tab').forEach(item => item.classList.toggle('active', Number(item.dataset.index) === index));
+            panels.querySelectorAll('.page-script-panel').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.panel) === index));
+        }));
+        tabs.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
+            const index = Number(button.dataset.copy);
+            try {
+                await navigator.clipboard.writeText(sourceCache[index] || '');
+                const original = button.textContent;
+                button.textContent = 'Tersalin';
+                setTimeout(() => button.textContent = original, 1400);
+            } catch (_) {
+                this.showToast('Tidak dapat menyalin kode.', 'error');
+            }
+        }));
+        tabs.querySelectorAll('[data-download]').forEach(button => button.addEventListener('click', () => {
+            const index = Number(button.dataset.download);
+            const script = scripts[index];
+            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
+            const blobUrl = URL.createObjectURL(new Blob([sourceCache[index] || ''], { type: 'text/plain;charset=utf-8' }));
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        }));
+
+        await Promise.all(scripts.map(async (script, index) => {
+            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
+            try {
+                const response = await fetch(`${rawBase}${encodeURIComponent(filename)}`, { cache: 'no-store' });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const code = await response.text();
+                sourceCache[index] = code;
+                const block = document.getElementById(`page-code-${index}`);
+                if (block) {
+                    block.textContent = code;
+                    if (typeof Prism !== 'undefined') Prism.highlightElement(block);
+                }
+            } catch (error) {
+                const block = document.getElementById(`page-code-${index}`);
+                if (block) block.textContent = '-- Kode Lua gagal dimuat.';
+                console.warn('Gagal memuat source Lua:', filename, error);
+            }
+        }));
+    },
+
     handleRouting() {
         const hash = location.hash.slice(1);
+        const pageId = new URLSearchParams(location.search).get('page');
         document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
         window.scrollTo(0, 0);
-        
+
         if (hash === 'admin') {
             if (!this.currentUser) {
                 this.toggleLoginModal();
-                location.hash = '';
+                window.location.href = CONFIG.pagesBaseUrl();
                 return;
             }
             document.getElementById('view-admin').style.display = 'block';
             this.switchAdminTab('list');
-        } else {
-            document.getElementById('view-home').style.display = 'block';
+            return;
         }
+
+        if (pageId) {
+            document.getElementById('view-page').style.display = 'block';
+            this.renderPageViewer(pageId);
+            return;
+        }
+
+        document.getElementById('view-home').style.display = 'block';
     }
 };
 
@@ -1970,7 +2112,8 @@ function navigate(path) {
         app.toggleLoginModal();
         return;
     }
-    location.hash = path;
+    const base = CONFIG.pagesBaseUrl();
+    window.location.href = path ? `${base}#${encodeURIComponent(path)}` : base;
 }
 
 window.addEventListener('DOMContentLoaded', () => {

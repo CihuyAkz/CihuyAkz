@@ -1,26 +1,6 @@
 {
+  "pages": {},
   "scripts": {},
   "bots": {},
-  "pages": {
-    "Idk tes": {
-      "id": "idk-tes",
-      "title": "Idk tes",
-      "displayTitle": "Idk tes",
-      "visibility": "PUBLIC",
-      "description": "",
-      "scripts": [
-        {
-          "id": "idk",
-          "name": "Idk",
-          "filename": "idk.lua",
-          "size": 5,
-          "created": "2026-09-25T12:11:57.083Z",
-          "updated": "2026-09-25T12:11:57.083Z"
-        }
-      ],
-      "created": "2026-09-25T12:11:57.083Z",
-      "updated": "2026-09-25T12:11:57.083Z"
-    }
-  },
   "luaSnippets": {}
 }

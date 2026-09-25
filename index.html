@@ -40,7 +40,7 @@
                     <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Masuk</button>
                 </div>
                 <div id="user-section" style="display:none">
-                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Admin</button>
+                    <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
                 </div>
             </div>
         </div>
@@ -124,13 +124,24 @@
             </div>
         </div>
 
+        <div id="view-page" class="view-section animate__animated animate__fadeIn" style="display:none">
+            <div class="script-page-container page-view-container">
+                <section id="script-content" class="script-page-content">
+                    <div class="page-view-topbar">
+                        <button class="btn btn-secondary btn-sm" type="button" onclick="navigate('')">← Kembali</button>
+                    </div>
+                    <div id="page-view-content"></div>
+                </section>
+            </div>
+        </div>
+
         <div id="view-admin" class="view-section animate__animated animate__fadeIn" style="display:none">
             <div class="admin-topbar">
                 <div class="admin-brand-block">
                     <div class="admin-brand-mark">CA</div>
                     <div>
                         <span class="admin-breadcrumb">RUANG ADMIN</span>
-                        <h2>CihuyAkz Control Center</h2>
+                        <h2>Pusat Kendali CihuyAkz</h2>
                         <p>Kelola page, script Lua, dan bot dari satu panel.</p>
                     </div>
                 </div>
@@ -155,7 +166,7 @@
                     </div>
                     <div class="admin-sidebar-tip">
                         <span class="tip-dot"></span>
-                        <div><strong>Mode aman</strong><p>Pesan kritis dan kegagalan publish ditampilkan dalam Bahasa Indonesia.</p></div>
+                        <div><strong>Mode aman</strong><p>Pesan penting dan kegagalan penerbitan ditampilkan dalam Bahasa Indonesia.</p></div>
                     </div>
                 </aside>
 
@@ -228,7 +239,7 @@
 
                     <div id="admin-tab-bots" class="admin-tab" style="display:none">
                         <div class="admin-content-card">
-                            <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">AUTOMASI</span><h3>Bot Discord</h3><span>Atur posting manual atau terjadwal.</span></div><button class="btn btn-primary btn-sm" onclick="app.switchAdminTab('create-bot')">+ Buat Bot</button></div>
+                            <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">AUTOMASI</span><h3>Bot Discord</h3><span>Atur pengiriman manual atau terjadwal.</span></div><button class="btn btn-primary btn-sm" onclick="app.switchAdminTab('create-bot')">+ Buat Bot</button></div>
                             <div id="bots-list"></div>
                         </div>
                     </div>
@@ -260,6 +271,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260925-admin-v3"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+    <script src="app.js?v=20260925-admin-v4"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>
