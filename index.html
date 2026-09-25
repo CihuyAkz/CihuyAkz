@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-admin-v4">
+    <link rel="stylesheet" href="style.css?v=20260925-admin-v1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -37,7 +37,7 @@
 
             <div class="nav-right">
                 <div id="auth-section">
-                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Sign In</button>
+                    <button class="btn btn-secondary btn-sm" onclick="app.toggleLoginModal()">Login</button>
                 </div>
                 <div id="user-section" style="display:none">
                     <button class="btn btn-primary btn-sm" onclick="navigate('admin')">Manage</button>
@@ -49,16 +49,16 @@
     <div id="login-modal" class="modal-overlay animate__animated animate__fadeIn" style="display:none" onclick="if(event.target===this) app.toggleLoginModal()">
         <div class="modal animate__animated animate__zoomIn">
             <div class="modal-header">
-                <h3>Sign in to CihuyAkz</h3>
+                <h3>Login CihuyAkz</h3>
                 <button class="close-btn" onclick="app.toggleLoginModal()">×</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
                     <label>GitHub Token</label>
-                    <input type="password" id="auth-token" class="input-field" placeholder="Enter your GitHub token" autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
+                    <input type="password" id="auth-token" class="input-field" placeholder="ghp_..." autocomplete="off" onkeypress="if(event.key==='Enter') app.login()">
                 </div>
                 <div id="login-error" role="alert" aria-live="polite" style="color:var(--color-danger);font-size:13px;margin:16px 0;text-align:center;display:none"></div>
-                <button class="btn btn-full" onclick="app.login()">Sign In</button>
+                <button class="btn btn-full" onclick="app.login()">Login</button>
             </div>
         </div>
     </div>
@@ -68,7 +68,7 @@
             <div class="content-wrapper">
                 <aside class="sidebar">
                     <div class="sidebar-section">
-                        <h3 class="sidebar-title">Filter</h3>
+                        <h3 class="sidebar-title">Filters</h3>
                         <div class="sidebar-links">
                             <a href="#" class="sidebar-link active" data-filter="all" onclick="event.preventDefault(); app.filterCategory('all', event)">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -103,10 +103,10 @@
                         </div>
                     </div>
                     <div class="sidebar-section sidebar-sort">
-                        <h3 class="sidebar-title">Sort</h3>
+                        <h3 class="sidebar-title">Sort By</h3>
                         <select class="input-field select-sm" id="sort-select" onchange="app.setSort(this.value)">
-                            <option value="newest">Newest</option>
-                            <option value="oldest">Oldest</option>
+                            <option value="newest">Newest First</option>
+                            <option value="oldest">Oldest First</option>
                             <option value="alpha">A-Z</option>
                             <option value="updated">Recently Updated</option>
                         </select>
@@ -126,130 +126,245 @@
 
         <div id="view-admin" class="view-section animate__animated animate__fadeIn" style="display:none">
             <div class="admin-topbar">
-                <div class="admin-brand-block">
-                    <div class="admin-brand-mark">CA</div>
+                <div class="admin-topbar-left">
+                    <button class="btn-back" onclick="navigate('')">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M19 12H5M12 19l-7-7 7-7"/>
+                        </svg>
+                        Back to Site
+                    </button>
+                    <div class="admin-context">
+                        <span class="admin-eyebrow">Workspace</span>
+                        <span class="admin-context-title">Content Management</span>
+                    </div>
+                </div>
+                <div class="admin-topbar-actions">
+                    <span class="admin-session-label">
+                        <span class="admin-session-dot"></span>
+                        <span>Authenticated</span>
+                    </span>
+                    <button class="btn btn-secondary btn-sm" onclick="app.logout()">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                            <polyline points="16 17 21 12 16 7"></polyline>
+                            <line x1="21" y1="12" x2="9" y2="12"></line>
+                        </svg>
+                        Sign Out
+                    </button>
+                </div>
+            </div>
+
+            <div class="admin-panel">
+                <header class="admin-hero">
                     <div>
-                        <span class="admin-breadcrumb">MANAGE CENTER</span>
-                        <h2>CihuyAkz Control Center</h2>
-                        <p>Manage pages, Lua scripts, and Discord bots from one workspace.</p>
+                        <span class="admin-kicker">Admin Console</span>
+                        <h1>Manage your script library</h1>
+                        <p>Create pages, organize multiple scripts under one URL, and keep publishing controls in one place.</p>
                     </div>
-                </div>
-                <div class="admin-top-actions">
-                    <button class="btn-back" onclick="navigate('')">← Back to Site</button>
-                    <button class="btn btn-secondary btn-sm" onclick="app.logout()">Sign Out</button>
-                </div>
-            </div>
-
-            <div class="admin-shell">
-                <aside class="admin-sidebar">
-                    <div class="admin-user-card">
-                        <div class="admin-avatar">CA</div>
-                        <div><strong id="admin-user-name">Manage</strong><span>Connected to GitHub</span></div>
-                    </div>
-                    <div class="admin-nav-label">PANEL</div>
-                    <div class="tab-switcher admin-nav">
-                        <button class="tab-btn active" data-admin-tab="list" onclick="app.switchAdminTab('list')"><span>01</span> Pages</button>
-                        <button class="tab-btn" data-admin-tab="create" onclick="app.switchAdminTab('create')"><span>02</span> New Page</button>
-                        <button class="tab-btn" data-admin-tab="snippets" onclick="app.switchAdminTab('snippets')"><span>03</span> Lua Library</button>
-                        <button class="tab-btn" data-admin-tab="bots" onclick="app.switchAdminTab('bots')"><span>04</span> Discord Bots</button>
-                    </div>
-                    <div class="admin-sidebar-tip">
-                        <span class="tip-dot"></span>
-                        <div><strong>Safe Mode</strong><p>Critical messages and publishing errors are shown in English.</p></div>
-                    </div>
-                </aside>
-
-                <main class="admin-main-panel">
-                    <div id="admin-tab-list" class="admin-tab" style="display:block">
-                        <div class="admin-hero-card">
+                    <div class="admin-hero-meta">
+                        <div class="admin-user-card">
+                            <div class="admin-user-avatar">CA</div>
                             <div>
-                                <span class="admin-kicker">DASHBOARD</span>
-                                <h3>Manage all content from one place.</h3>
-                                <p>A page can contain multiple Lua scripts, and reusable snippets can be inserted without repeated copy-pasting.</p>
-                            </div>
-                            <button class="btn btn-primary" onclick="app.switchAdminTab('create')">+ New Page</button>
-                        </div>
-                        <div class="admin-stats-grid">
-                            <div class="stat-card stat-card-large"><span class="stat-label">PAGE</span><strong id="pages-count">0</strong><span class="stat-hint">Total pages</span></div>
-                            <div class="stat-card"><span class="stat-label">SCRIPT</span><strong id="scripts-count">0</strong><span class="stat-hint">All scripts across pages</span></div>
-                            <div class="stat-card"><span class="stat-label">PUBLIC</span><strong id="public-pages-count">0</strong><span class="stat-hint">Public pages</span></div>
-                            <div class="stat-card"><span class="stat-label">LUA</span><strong id="snippets-count">0</strong><span class="stat-hint">Reusable snippets</span></div>
-                        </div>
-                        <div class="admin-content-card">
-                            <div class="admin-list-header admin-list-header-modern">
-                                <div><span class="admin-kicker">CONTENT</span><h3>Page List</h3><span id="total-stats">Loading...</span></div>
-                                <div class="admin-list-search"><span>⌕</span><input id="admin-page-search" type="search" placeholder="Search pages or scripts..." oninput="app.setAdminSearch(this.value)"></div>
-                            </div>
-                            <div id="admin-list"></div>
-                        </div>
-                    </div>
-
-                    <div id="admin-tab-editor" class="admin-tab" style="display:none">
-                        <div class="editor-container page-editor-shell admin-content-card">
-                            <div class="editor-title-row">
-                                <div><span class="admin-kicker">PAGE BUILDER</span><h3 id="editor-heading">New Page</h3><p class="editor-subtitle">One page title can contain multiple Script Names.</p></div>
-                                <span class="editor-status" id="page-editor-status">Draft</span>
-                            </div>
-                            <div class="page-settings-card">
-                                <div class="section-heading"><div><h4>Page Information</h4><p>This title becomes the page visitors open.</p></div><span class="section-number">01</span></div>
-                                <div class="form-row">
-                                    <div class="form-group form-group-flex"><label>Page Title</label><input type="text" id="edit-title" class="input-field" placeholder="Example: Ultimate Tools Pack"></div>
-                                    <div class="form-group"><label>Visibility</label><select id="edit-visibility" class="input-field"><option value="PUBLIC">Public</option><option value="PRIVATE">Private</option><option value="UNLISTED">Unlisted</option></select></div>
-                                </div>
-                                <div class="form-group"><label>Description</label><textarea id="edit-desc" class="input-field" rows="3" placeholder="A short description for this page..."></textarea></div>
-                            </div>
-                            <div class="scripts-builder-card">
-                                <div class="section-heading scripts-section-heading"><div><h4>Scripts in this Page</h4><p>Each card has a <strong>Script Name</strong> and its own Lua editor.</p></div><button class="btn btn-secondary btn-sm" onclick="app.addScriptEditor()">+ Add Script</button></div>
-                                <div id="script-editor-list" class="script-editor-list"></div>
-                            </div>
-                            <div class="editor-actions">
-                                <div class="action-note"><span class="dot"></span><span id="script-editor-count">0 scripts</span></div>
-                                <div class="action-buttons"><button class="btn btn-secondary" onclick="app.switchAdminTab('list')">Cancel</button><button id="page-save-btn" class="btn btn-primary" onclick="app.savePage()">Publish Page</button></div>
+                                <strong>CihuyAkz</strong>
+                                <span>GitHub Publisher</span>
                             </div>
                         </div>
                     </div>
+                </header>
 
-                    <div id="admin-tab-snippets" class="admin-tab" style="display:none">
-                        <div class="snippet-layout">
-                            <section class="admin-content-card snippet-editor-card">
-                                <div class="editor-title-row"><div><span class="admin-kicker">LUA LIBRARY</span><h3 id="snippet-editor-heading">Add Lua Snippet</h3><p class="editor-subtitle">Save frequently used code so it can be inserted with one click.</p></div></div>
-                                <input type="hidden" id="snippet-id">
-                                <div class="form-group"><label>Snippet Name</label><input type="text" id="snippet-title" class="input-field" placeholder="Example: Basic Loader"></div>
-                                <div class="form-group"><label>Description</label><input type="text" id="snippet-desc" class="input-field" placeholder="What this snippet is used for"></div>
-                                <div class="form-group"><label>Lua Code</label><textarea id="snippet-code" class="input-field snippet-code-input" rows="15" placeholder="Paste or write reusable Lua code..."></textarea></div>
-                                <div class="action-buttons"><button class="btn btn-secondary" onclick="app.resetSnippetEditor()">Clear</button><button id="snippet-save-btn" class="btn btn-primary" onclick="app.saveLuaSnippet()">Save Snippet</button></div>
-                            </section>
-                            <section class="admin-content-card snippet-library-card">
-                                <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">READY-TO-INSERT CODE</span><h3>Lua Snippets</h3><span>Insert snippets directly from the Page editor.</span></div><div class="admin-list-search"><span>⌕</span><input id="snippet-search" type="search" placeholder="Search snippets..." oninput="app.renderLuaLibrary()"></div></div>
-                                <div id="lua-snippet-list" class="lua-snippet-list"></div>
-                            </section>
+                <div class="admin-stats" id="admin-stats">
+                    <div class="admin-stat-card">
+                        <span>Pages</span>
+                        <strong id="admin-page-count">—</strong>
+                        <small>Published content pages</small>
+                    </div>
+                    <div class="admin-stat-card">
+                        <span>Scripts</span>
+                        <strong id="admin-script-count">—</strong>
+                        <small>Scripts across all pages</small>
+                    </div>
+                    <div class="admin-stat-card">
+                        <span>Bots</span>
+                        <strong id="admin-bot-count">—</strong>
+                        <small>Discord automation posts</small>
+                    </div>
+                </div>
+
+                <div class="admin-nav-row">
+                    <div class="tab-switcher admin-tab-switcher">
+                        <button class="tab-btn active" data-admin-tab="list" onclick="app.switchAdminTab('list')">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M4 5h16M4 12h16M4 19h10"></path>
+                            </svg>
+                            Pages
+                        </button>
+                        <button class="tab-btn" data-admin-tab="create" onclick="app.switchAdminTab('create')">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            Create Page
+                        </button>
+                        <button class="tab-btn" data-admin-tab="bots" onclick="app.switchAdminTab('bots')">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="9"></circle>
+                                <path d="M12 8v4l3 2"></path>
+                            </svg>
+                            Bots
+                        </button>
+                    </div>
+                    <div class="admin-nav-note">Use one page for multiple related scripts.</div>
+                </div>
+
+                <div id="admin-tab-editor" class="admin-tab" style="display:none">
+                    <div class="editor-container admin-editor">
+                        <div class="editor-topline">
+                            <div>
+                                <span class="section-kicker">Page Editor</span>
+                                <h2 id="editor-heading">Create New Page</h2>
+                                <p class="editor-subtitle">Set the page title, then add as many named scripts as you need.</p>
+                            </div>
+                            <div class="editor-badge">Multi-script publishing</div>
+                        </div>
+
+                        <div class="page-form-grid">
+                            <div class="form-group form-group-flex">
+                                <label for="edit-page-title">Page Title</label>
+                                <input type="text" id="edit-page-title" class="input-field" placeholder="e.g. Combat Systems">
+                                <small class="field-hint">This is the public page title and URL identity.</small>
+                            </div>
+                            <div class="form-group">
+                                <label for="edit-visibility">Visibility</label>
+                                <select id="edit-visibility" class="input-field">
+                                    <option value="PUBLIC">Public</option>
+                                    <option value="PRIVATE">Private</option>
+                                    <option value="UNLISTED">Unlisted</option>
+                                </select>
+                                <small class="field-hint">Controls whether this page appears in the library.</small>
+                            </div>
+                            <div class="form-group page-description-field">
+                                <label for="edit-desc">Page Description</label>
+                                <textarea id="edit-desc" class="input-field" rows="3" placeholder="Explain what this page contains..."></textarea>
+                            </div>
+                        </div>
+
+                        <div class="script-builder-header">
+                            <div>
+                                <span class="section-kicker">Script Collection</span>
+                                <h3>Scripts on this page <span id="script-count-label">1 script</span></h3>
+                            </div>
+                            <button class="btn btn-secondary add-script-btn" onclick="app.addScriptBlock()">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 5v14M5 12h14"></path>
+                                </svg>
+                                Add Script
+                            </button>
+                        </div>
+
+                        <div id="script-builder" class="script-builder"></div>
+
+                        <div class="editor-footer">
+                            <div class="editor-footer-note">
+                                <span class="editor-note-dot"></span>
+                                Each script gets its own raw file while sharing the same page URL.
+                            </div>
+                            <div class="action-buttons">
+                                <button class="btn btn-secondary" onclick="app.switchAdminTab('list')">Cancel</button>
+                                <button class="btn btn-primary" onclick="app.savePage()">Publish Page</button>
+                            </div>
                         </div>
                     </div>
+                </div>
 
-                    <div id="admin-tab-bots" class="admin-tab" style="display:none">
-                        <div class="admin-content-card">
-                            <div class="admin-list-header admin-list-header-modern"><div><span class="admin-kicker">AUTOMATION</span><h3>Discord Bots</h3><span>Manage manual or scheduled posts.</span></div><button class="btn btn-primary btn-sm" onclick="app.switchAdminTab('create-bot')">+ New Bot</button></div>
-                            <div id="bots-list"></div>
+                <div id="admin-tab-list" class="admin-tab" style="display:block">
+                    <div class="admin-list-header modern-list-header">
+                        <div>
+                            <span class="section-kicker">Library</span>
+                            <h2>Published Pages</h2>
+                        </div>
+                        <div class="admin-list-header-actions">
+                            <span id="total-stats">Loading...</span>
+                            <button class="btn btn-sm" onclick="app.switchAdminTab('create')">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M12 5v14M5 12h14"></path>
+                                </svg>
+                                New Page
+                            </button>
                         </div>
                     </div>
+                    <div id="admin-list"></div>
+                </div>
 
-                    <div id="admin-tab-bot-editor" class="admin-tab" style="display:none">
-                        <div class="admin-content-card bot-form-container">
-                            <div class="editor-title-row"><div><span class="admin-kicker">BOT DISCORD</span><h3 id="bot-editor-heading">New Bot</h3></div></div>
-                            <div class="form-group"><label>Post Title</label><input type="text" id="bot-title" class="input-field" placeholder="Thread title for Discord"></div>
-                            <div class="form-group"><label>Message</label><textarea id="bot-message" class="input-field" rows="5" placeholder="Message that will be sent to Discord"></textarea></div>
-                            <div class="form-group"><label class="checkbox-row"><input type="checkbox" id="bot-schedule" onchange="app.toggleScheduleFields()"> Schedule post</label></div>
-                            <div id="schedule-fields" class="schedule-fields"><div class="form-group"><label>Send Time</label><input type="datetime-local" id="bot-schedule-time" class="input-field"></div><div class="form-group"><label>Time Zone</label><select id="bot-timezone" class="input-field"><option value="UTC">UTC</option><option value="Asia/Jakarta">WIB — Jakarta</option><option value="Asia/Tokyo">JST — Tokyo</option><option value="Europe/London">GMT — London</option></select></div></div>
-                            <div class="bot-actions"><div class="action-buttons"><button class="btn btn-secondary" onclick="app.switchAdminTab('bots')">Cancel</button><button class="btn btn-primary" onclick="app.saveBot()">Send Bot</button></div></div>
+                <div id="admin-tab-bots" class="admin-tab" style="display:none">
+                    <div class="admin-list-header modern-list-header">
+                        <div>
+                            <span class="section-kicker">Automation</span>
+                            <h2>Bot Posts</h2>
+                        </div>
+                        <button class="btn btn-sm" onclick="app.switchAdminTab('create-bot')">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"></path>
+                            </svg>
+                            Create Bot
+                        </button>
+                    </div>
+                    <div id="bots-list"></div>
+                </div>
+
+                <div id="admin-tab-bot-editor" class="admin-tab" style="display:none">
+                    <div class="bot-form-container">
+                        <div class="editor-topline">
+                            <div>
+                                <span class="section-kicker">Automation</span>
+                                <h2 id="bot-editor-heading">Create New Bot</h2>
+                                <p class="editor-subtitle">Prepare a Discord post or schedule it for later.</p>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="bot-title">Post Title</label>
+                            <input type="text" id="bot-title" class="input-field" placeholder="Thread title for Discord">
+                        </div>
+                        <div class="form-group">
+                            <label for="bot-message">Message Content</label>
+                            <textarea id="bot-message" class="input-field" rows="4" placeholder="Message to send to Discord"></textarea>
+                        </div>
+                        <div class="form-group schedule-toggle-row">
+                            <label class="toggle-field">
+                                <input type="checkbox" id="bot-schedule" onchange="app.toggleScheduleFields()">
+                                <span class="toggle-ui"></span>
+                                <span>
+                                    <strong>Schedule Post</strong>
+                                    <small>Send automatically at a specific time.</small>
+                                </span>
+                            </label>
+                        </div>
+                        <div id="schedule-fields" class="schedule-fields">
+                            <div class="form-group">
+                                <label for="bot-schedule-time">Scheduled Time</label>
+                                <input type="datetime-local" id="bot-schedule-time" class="input-field">
+                            </div>
+                            <div class="form-group">
+                                <label for="bot-timezone">Timezone</label>
+                                <select id="bot-timezone" class="input-field">
+                                    <option value="UTC">UTC</option>
+                                    <option value="America/New_York">Eastern Time (ET)</option>
+                                    <option value="America/Chicago">Central Time (CT)</option>
+                                    <option value="America/Denver">Mountain Time (MT)</option>
+                                    <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                                    <option value="Europe/London">London (GMT)</option>
+                                    <option value="Europe/Paris">Paris (CET)</option>
+                                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                                    <option value="Australia/Sydney">Sydney (AEST)</option>
+                                    <option value="Asia/Jakarta">Jakarta (WIB)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="bot-actions">
+                            <div class="action-buttons">
+                                <button class="btn btn-secondary" onclick="app.switchAdminTab('bots')">Cancel</button>
+                                <button class="btn btn-primary" onclick="app.saveBot()">Send Bot</button>
+                            </div>
                         </div>
                     </div>
-                </main>
-            </div>
-
-            <div id="lua-insert-modal" class="modal-overlay" style="display:none" onclick="if(event.target===this) app.closeInsertLuaModal()">
-                <div class="modal lua-insert-modal">
-                    <div class="modal-header"><div><span class="admin-kicker">INSERT</span><h3>Choose Lua Snippet</h3></div><button class="close-btn" onclick="app.closeInsertLuaModal()">×</button></div>
-                    <div class="modal-body"><div class="admin-list-search modal-search"><span>⌕</span><input id="insert-lua-search" type="search" placeholder="Search snippets..." oninput="app.renderInsertLuaList()"></div><div id="insert-lua-list" class="insert-lua-list"></div></div>
                 </div>
             </div>
         </div>
@@ -260,6 +375,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260925-admin-v4"></script>
+    <script src="app.js?v=20260925-admin-v1"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>

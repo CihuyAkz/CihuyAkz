@@ -1,30 +1,14 @@
 const CONFIG = {
-    // Fallback repository values used outside a GitHub Pages project site.
-    fallbackRepoOwner: 'CihuyAkz',
-    fallbackRepo: 'CihuyAkz',
+    // GitHub repository used for publishing. Only this GitHub account may log in.
+    repoOwner: 'CihuyAkz',
+    repo: 'CihuyAkz',
     allowedUser: 'CihuyAkz',
-    ownerLogin: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
 
-    // Detect the active GitHub Pages project path at runtime.
-    // This prevents generated page links from pointing at the wrong repository.
-    get repoOwner() {
-        const host = (location.hostname || '').toLowerCase();
-        const match = host.match(/^([^.]*)\.github\.io$/);
-        return match?.[1] || this.fallbackRepoOwner;
-    },
-    get repo() {
-        const host = (location.hostname || '').toLowerCase();
-        const isGithubPages = /^([^.]*)\.github\.io$/.test(host);
-        const parts = (location.pathname || '').split('/').filter(Boolean);
-        return isGithubPages && parts[0] ? decodeURIComponent(parts[0]) : this.fallbackRepo;
-    },
+    // GitHub Pages URL for this project fork.
     pagesBaseUrl() {
-        return `https://${this.repoOwner}.github.io/${encodeURIComponent(this.repo)}/`;
-    },
-    pageUrl(path) {
-        return new URL(path.replace(/^\/+/, ''), this.pagesBaseUrl()).href;
+        return `https://${this.repoOwner.toLowerCase()}.github.io/${this.repo}/`;
     }
 };
 
@@ -68,20 +52,20 @@ const utils = {
     },
 
     validateTitle(title) {
-        if (!title || title.trim().length === 0) return 'Title is required.';
-        if (title.length > 100) return 'Title can contain up to 100 characters.';
+        if (!title || title.trim().length === 0) return 'Title is required';
+        if (title.length > 100) return 'Title must be less than 100 characters';
         const sanitized = this.sanitizeTitle(title);
         if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
-            return 'The title contains invalid characters.';
+            return 'Invalid title characters';
         }
         const reserved = ['con', 'prn', 'aux', 'nul'];
-        if (reserved.includes(sanitized.toLowerCase())) return 'Invalid title.';
+        if (reserved.includes(sanitized.toLowerCase())) return 'Invalid title';
         return null;
     },
 
     validateCode(code) {
-        if (!code || code.trim().length === 0) return 'Lua code is required.';
-        if (code.length > 100000) return 'Lua code is too large (maximum 100 KB).';
+        if (!code || code.trim().length === 0) return 'Code is required';
+        if (code.length > 100000) return 'Code is too large (max 100KB)';
         return null;
     },
     
@@ -110,17 +94,13 @@ const app = {
     actionInProgress: false,
     currentEditingId: null,
     originalTitle: null,
-    originalScriptId: null,
+    originalPageId: null,
     currentBotId: null,
+    cmEditors: {},
+    scriptDraftCounter: 0,
     isLoading: false,
     searchQuery: '',
-    adminSearchQuery: '',
-    pageEditors: {},
-    pageEditorCounter: 0,
-    currentEditingPageTitle: null,
-    originalPageId: null,
     scheduledTimers: {},
-    insertTargetEditorId: null,
     
     async init() {
         const sessionValid = await this.loadSession();
@@ -135,10 +115,10 @@ const app = {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 if (location.hash === '#admin') {
-                    const activeTab = document.querySelector('.tab-btn.active')?.textContent?.toLowerCase() || '';
-                    if (activeTab.includes('add new') || activeTab.includes('manage')) {
-                        if (document.getElementById('admin-tab-editor')?.style.display !== 'none') this.savePage();
-                    } else if (activeTab.includes('bots') || activeTab.includes('create bot')) {
+                    const activeTab = document.querySelector('.tab-btn.active')?.dataset.adminTab;
+                    if (activeTab === 'create') {
+                        this.savePage();
+                    } else if (activeTab === 'bots' || activeTab === 'create-bot') {
                         this.saveBot();
                     }
                 }
@@ -176,45 +156,42 @@ const app = {
     },
     
     initCodeMirror() {
-        if (window.cmEditor) return;
-        const textarea = document.getElementById('edit-code');
-        if (textarea && typeof CodeMirror !== 'undefined') {
-            window.cmEditor = CodeMirror.fromTextArea(textarea, {
+        if (typeof CodeMirror === 'undefined') return;
+        document.querySelectorAll('#script-builder .script-code-textarea').forEach(textarea => {
+            const entryId = textarea.closest('.script-entry')?.dataset.entryId;
+            if (!entryId || this.cmEditors[entryId]) return;
+            const editor = CodeMirror.fromTextArea(textarea, {
                 mode: 'lua',
                 theme: 'monokai',
                 lineNumbers: true,
                 lineWrapping: true,
                 matchBrackets: true,
-                indentUnit: 4
+                indentUnit: 4,
+                tabSize: 4,
+                viewportMargin: Infinity
             });
-        }
-    },
-
-    initPageCodeEditor(editorId, textarea) {
-        if (!textarea || typeof CodeMirror === 'undefined') return;
-        if (this.pageEditors[editorId]) {
-            this.pageEditors[editorId].refresh();
-            return;
-        }
-        const cm = CodeMirror.fromTextArea(textarea, {
-            mode: 'lua',
-            theme: 'monokai',
-            lineNumbers: true,
-            lineWrapping: true,
-            matchBrackets: true,
-            indentUnit: 4,
-            viewportMargin: 40
+            this.cmEditors[entryId] = editor;
+            editor.on('change', () => {
+                const entry = document.querySelector(`.script-entry[data-entry-id="${CSS.escape(entryId)}"]`);
+                if (entry) {
+                    const size = entry.querySelector('.script-size-label');
+                    if (size) size.textContent = `${editor.getValue().length.toLocaleString()} characters`;
+                }
+            });
         });
-        cm.on('change', () => this.updateScriptEditorCount());
-        this.pageEditors[editorId] = cm;
-        requestAnimationFrame(() => cm.refresh());
+        Object.values(this.cmEditors).forEach(editor => editor.refresh());
     },
 
-    destroyPageEditors() {
-        Object.values(this.pageEditors).forEach(editor => {
+    destroyCodeMirrorEditors() {
+        Object.values(this.cmEditors || {}).forEach(editor => {
             try { editor.toTextArea(); } catch (_) {}
         });
-        this.pageEditors = {};
+        this.cmEditors = {};
+    },
+
+    async ensureDatabaseSha() {
+        if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
+        return this.dbSha;
     },
 
     async loadSession() {
@@ -253,10 +230,75 @@ const app = {
         const unlistedFilter = document.getElementById('unlisted-filter');
         if (privateFilter) privateFilter.style.display = 'block';
         if (unlistedFilter) unlistedFilter.style.display = 'block';
-        const adminName = document.getElementById('admin-user-name');
-        const adminAvatar = document.querySelector('.admin-avatar');
-        if (adminName) adminName.textContent = this.currentUser?.login || 'Admin';
-        if (adminAvatar) adminAvatar.textContent = (this.currentUser?.login || 'CA').slice(0, 2).toUpperCase();
+    },
+
+    normalizeDatabase(database) {
+        const db = (database && typeof database === 'object') ? database : {};
+        if (!db.bots || typeof db.bots !== 'object') db.bots = {};
+        if (!db.pages || typeof db.pages !== 'object') db.pages = {};
+
+        // Backward compatibility: turn legacy one-script records into one page each.
+        if (db.scripts && typeof db.scripts === 'object' && Object.keys(db.scripts).length) {
+            Object.entries(db.scripts).forEach(([legacyTitle, legacy]) => {
+                const pageId = utils.sanitizeTitle(legacy.displayTitle || legacy.title || legacyTitle) || `page-${Date.now()}`;
+                if (db.pages[pageId]) return;
+                const scriptId = utils.sanitizeTitle(legacy.title || legacyTitle) || `script-${Date.now()}`;
+                db.pages[pageId] = {
+                    id: pageId,
+                    title: legacy.displayTitle || legacy.title || legacyTitle,
+                    displayTitle: legacy.displayTitle || legacy.title || legacyTitle,
+                    visibility: legacy.visibility || 'PUBLIC',
+                    description: legacy.description || '',
+                    filename: legacy.filename || `${scriptId}.lua`,
+                    created: legacy.created || new Date().toISOString(),
+                    updated: legacy.updated || legacy.created || new Date().toISOString(),
+                    scripts: {
+                        [scriptId]: {
+                            id: scriptId,
+                            name: legacy.displayTitle || legacy.title || legacyTitle,
+                            displayName: legacy.displayTitle || legacy.title || legacyTitle,
+                            filename: legacy.filename || `${scriptId}.lua`,
+                            size: legacy.size || 0,
+                            created: legacy.created || new Date().toISOString(),
+                            updated: legacy.updated || legacy.created || new Date().toISOString()
+                        }
+                    }
+                };
+            });
+            delete db.scripts;
+        }
+
+        Object.entries(db.pages).forEach(([pageId, page]) => {
+            if (!page || typeof page !== 'object') {
+                delete db.pages[pageId];
+                return;
+            }
+            page.id = page.id || pageId;
+            page.title = page.title || page.displayTitle || pageId;
+            page.displayTitle = page.displayTitle || page.title;
+            page.visibility = page.visibility || 'PUBLIC';
+            page.description = page.description || '';
+            page.created = page.created || new Date().toISOString();
+            page.updated = page.updated || page.created;
+            if (!page.scripts || typeof page.scripts !== 'object') page.scripts = {};
+            Object.entries(page.scripts).forEach(([scriptId, script]) => {
+                if (!script || typeof script !== 'object') {
+                    delete page.scripts[scriptId];
+                    return;
+                }
+                script.id = script.id || scriptId;
+                script.name = script.name || script.displayName || script.title || scriptId;
+                script.displayName = script.displayName || script.name;
+                script.filename = script.filename || `${scriptId}.lua`;
+                script.size = Number(script.size || 0);
+                script.created = script.created || page.created;
+                script.updated = script.updated || page.updated;
+            });
+        });
+
+        // Remove empty legacy helper for new writes.
+        if (db.scripts) delete db.scripts;
+        return db;
     },
 
     saveSession() {
@@ -268,7 +310,7 @@ const app = {
                 localStorage.setItem('gh_token_expiry', expiry.toString());
             } catch(e) {
                 console.error('Session save error:', e);
-                this.showToast('Failed to save session.', 'error');
+                this.showToast('Failed to save session', 'error');
             }
         }
     },
@@ -289,7 +331,7 @@ const app = {
         try {
             const token = document.getElementById('auth-token').value.trim();
             if (!token) {
-                this.showLoginError('GitHub token is required.');
+                this.showLoginError('Token is required');
                 return;
             }
             
@@ -301,7 +343,7 @@ const app = {
                 document.getElementById('auth-token').value = '';
                 await this.loadDatabase();
                 this.renderList();
-                this.showToast('Signed in successfully.', 'success');
+                this.showToast('Logged in successfully!', 'success');
             }
         } finally {
             this.actionInProgress = false;
@@ -316,38 +358,33 @@ const app = {
     },
     
     showToast(message, type = 'success') {
-        if (typeof Toastify === 'undefined') {
+        if (typeof Toastify !== 'undefined') {
+            const toast = Toastify({
+                text: message,
+                duration: 3600,
+                gravity: "top",
+                position: "right",
+                close: true,
+                closeOnClick: true,
+                stopOnFocus: false,
+                className: `cihuy-toast cihuy-toast-${type}`,
+                style: {
+                    background: type === 'success'
+                        ? 'linear-gradient(135deg,#22c55e,#15803d)'
+                        : type === 'error'
+                            ? 'linear-gradient(135deg,#ef4444,#b91c1c)'
+                            : 'linear-gradient(135deg,#f59e0b,#b45309)'
+                },
+                onClick: () => toast.hideToast()
+            });
+            toast.showToast();
+        } else {
             alert(message);
-            return;
         }
-
-        const toast = Toastify({
-            text: message,
-            duration: 3500,
-            gravity: 'top',
-            position: 'right',
-            close: true,
-            stopOnFocus: false,
-            style: {
-                background: type === 'success'
-                    ? 'linear-gradient(135deg, #0f766e, #14b8a6)'
-                    : type === 'error'
-                        ? 'linear-gradient(135deg, #991b1b, #ef4444)'
-                        : 'linear-gradient(135deg, #92400e, #f59e0b)'
-            }
-        });
-        toast.showToast();
-        requestAnimationFrame(() => {
-            const el = toast.toastElement;
-            if (!el) return;
-            el.style.cursor = 'pointer';
-            el.setAttribute('role', 'status');
-            el.addEventListener('pointerup', () => toast.hideToast(), { once: true });
-        });
     },
 
     logout(silent = false) {
-        if (!silent && !confirm('Are you sure you want to sign out?')) {
+        if (!silent && !confirm('Are you sure you want to logout?')) {
             return;
         }
         
@@ -375,7 +412,7 @@ const app = {
         location.href = '#';
         
         if (!silent) {
-            this.showToast('Signed out successfully.', 'success');
+            this.showToast('Logged out successfully', 'success');
             setTimeout(() => location.reload(), 1000);
         }
     },
@@ -386,7 +423,7 @@ const app = {
                 headers: { 'Authorization': `token ${this.token}` }
             });
             
-            if (!res.ok) throw new Error('The GitHub token is invalid or expired.');
+            if (!res.ok) throw new Error('Invalid token');
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
@@ -421,10 +458,11 @@ const app = {
             // scripts reappear even though the bundled database was cleaned.
             const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
-                this.db = JSON.parse(localSaved);
-                this.normalizeDatabase();
+                this.db = this.normalizeDatabase(JSON.parse(localSaved));
                 this.renderList();
                 this.renderAdminList();
+                this.renderAdminStats();
+                this.scheduleLoadedBots();
                 return;
             }
 
@@ -432,82 +470,55 @@ const app = {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache' }
             });
-            if (!localRes.ok) throw new Error(`Failed to load the bundled database (HTTP ${localRes.status}).`);
+            if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
 
-            this.db = await localRes.json();
-            this.normalizeDatabase();
+            this.db = this.normalizeDatabase(await localRes.json());
             try {
                 localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
                 console.warn('Local database cache unavailable:', storageError);
             }
 
-            Object.keys(this.scheduledTimers).forEach(id => clearTimeout(this.scheduledTimers[id]));
-            this.scheduledTimers = {};
-            Object.entries(this.db.bots).forEach(([botId, bot]) => {
-                if (bot.scheduled && bot.scheduledTime && !bot.sent && !bot.cancelled) {
-                    this.scheduleBotTimer(botId, bot);
-                }
-            });
+            this.scheduleLoadedBots();
 
             this.renderList();
             this.renderAdminList();
+            this.renderAdminStats();
         } catch (e) {
             console.error('DB Error', e);
             const list = document.getElementById('admin-list');
             if (list) {
                 list.innerHTML = `<div class="empty-admin-state">
-                    <p style="color:var(--color-danger)">An error occurred: ${e.message}</p>
+                    <p style="color:var(--color-danger)">Error: ${e.message}</p>
                     <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Retry</button>
                 </div>`;
             }
-            this.showToast(`An error occurred: ${e.message}`, 'error');
+            this.showToast(`Error: ${e.message}`, 'error');
         } finally {
             this.isLoading = false;
         }
     },
 
-    normalizeDatabase() {
-        if (!this.db || typeof this.db !== 'object') this.db = {};
-        if (!this.db.pages || typeof this.db.pages !== 'object') this.db.pages = {};
-        if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
-        if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
-        if (!this.db.luaSnippets || typeof this.db.luaSnippets !== 'object') this.db.luaSnippets = {};
+    scheduleLoadedBots() {
+        Object.keys(this.scheduledTimers).forEach(id => clearTimeout(this.scheduledTimers[id]));
+        this.scheduledTimers = {};
+        Object.entries(this.db?.bots || {}).forEach(([botId, bot]) => {
+            if (bot.scheduled && bot.scheduledTime && !bot.sent && !bot.cancelled) {
+                this.scheduleBotTimer(botId, bot);
+            }
+        });
+    },
 
-        // Backward compatibility: convert legacy one-script records into one-script pages.
-        for (const [legacyTitle, legacy] of Object.entries(this.db.scripts)) {
-            const pageTitle = legacy?.title || legacyTitle;
-            if (this.db.pages[pageTitle]) continue;
-            const pageId = utils.sanitizeTitle(pageTitle);
-            const legacyFilename = legacy?.filename || `${pageId}.lua`;
-            this.db.pages[pageTitle] = {
-                id: pageId,
-                title: pageTitle,
-                displayTitle: pageTitle,
-                visibility: legacy?.visibility || 'PUBLIC',
-                description: legacy?.description || '',
-                scripts: [{
-                    id: utils.sanitizeTitle(legacyTitle),
-                    name: legacy?.displayTitle || legacyTitle,
-                    filename: legacyFilename,
-                    size: legacy?.size || 0,
-                    created: legacy?.created || new Date().toISOString(),
-                    updated: legacy?.updated || legacy?.created || new Date().toISOString()
-                }],
-                created: legacy?.created || new Date().toISOString(),
-                updated: legacy?.updated || legacy?.created || new Date().toISOString(),
-                legacy: true
-            };
-        }
-
-        for (const [title, page] of Object.entries(this.db.pages)) {
-            page.id = page.id || utils.sanitizeTitle(title);
-            page.title = page.title || title;
-            page.displayTitle = page.displayTitle || page.title;
-            page.visibility = page.visibility || 'PUBLIC';
-            page.description = page.description || '';
-            page.scripts = Array.isArray(page.scripts) ? page.scripts : [];
-        }
+    renderAdminStats() {
+        const pages = Object.values(this.db?.pages || {});
+        const scripts = pages.reduce((sum, page) => sum + Object.keys(page.scripts || {}).length, 0);
+        const bots = Object.keys(this.db?.bots || {}).length;
+        const pageCount = document.getElementById('admin-page-count');
+        const scriptCount = document.getElementById('admin-script-count');
+        const botCount = document.getElementById('admin-bot-count');
+        if (pageCount) pageCount.textContent = pages.length;
+        if (scriptCount) scriptCount.textContent = scripts;
+        if (botCount) botCount.textContent = bots;
     },
 
     scheduleBotTimer(botId, bot) {
@@ -638,16 +649,16 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Bot triggered. Checking GitHub...', 'success');
+                    this.showToast('Triggered! Checking GitHub...', 'success');
                     return true;
                 }
             } else {
-                throw new Error(`GitHub mengembalikan HTTP ${workflowResponse.status}.`);
+                throw new Error(`GitHub Error: ${workflowResponse.status}`);
             }
             return false;
         } catch (error) {
             bot.isProcessing = false;
-            this.showToast(`An error occurred: ${error.message}`, 'error');
+            this.showToast(`Error: ${error.message}`, 'error');
             return false;
         }
     },
@@ -669,7 +680,7 @@ const app = {
         const timezone = timezoneInput ? timezoneInput.value : Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         if (!title || !message) {
-            this.showToast('Title and message are required.', 'error');
+            this.showToast('Title and message are required', 'error');
             return;
         }
         
@@ -686,7 +697,7 @@ const app = {
             if (schedule && scheduleTime) {
                 const localDate = new Date(scheduleTime);
                 if (localDate < new Date()) {
-                    this.showToast('The scheduled time cannot be in the past.', 'error');
+                    this.showToast('Time cannot be in the past', 'error');
                     this.actionInProgress = false;
                     saveBtn.disabled = false;
                     return;
@@ -724,20 +735,20 @@ const app = {
                 })
             });
 
-            if (!dbRes.ok) throw new Error('Failed to update the database.');
+            if (!dbRes.ok) throw new Error('Database update failed');
 
             const newDbData = await dbRes.json();
             this.dbSha = newDbData.content.sha;
 
             if (schedule) {
-                this.showToast('Schedule saved successfully.', 'success');
+                this.showToast(`Scheduled successfully`, 'success');
                 await this.loadDatabase();
             } else {
                 await this.sendBotNow(botId);
             }
 
         } catch(e) {
-            this.showToast(`An error occurred: ${e.message}`, 'error');
+            this.showToast(`Error: ${e.message}`, 'error');
         } finally {
             saveBtn.disabled = false;
             this.actionInProgress = false;
@@ -748,66 +759,65 @@ const app = {
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-        this.normalizeDatabase();
 
-        const pages = Object.entries(this.db.pages || {}).map(([title, data]) => ({ title, ...data }));
+        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ id, ...data }));
         const filtered = this.filterLogic(pages);
         const sorted = this.sortLogic(filtered);
 
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
-                <div class="empty-state-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
                 <h2>No pages found</h2>
-                <p>Try adjusting your search or filter</p>
+                <p>Try adjusting your search or filter.</p>
             </div>`;
             return;
         }
 
         list.innerHTML = sorted.map(page => {
+            const scripts = Object.values(page.scripts || {});
+            const scriptNames = scripts.slice(0, 3).map(script => utils.escapeHtml(script.name)).join(', ');
+            const moreCount = scripts.length > 3 ? ` +${scripts.length - 3} more` : '';
             const pageId = page.id || utils.sanitizeTitle(page.title);
-            const scriptsCount = Array.isArray(page.scripts) ? page.scripts.length : 0;
-            const scriptNames = (page.scripts || []).slice(0, 3).map(script => utils.escapeHtml(script.name || '')).join(' · ');
-            const pagePath = CONFIG.pageUrl(page.legacy ? `scripts/${encodeURIComponent(pageId)}/` : `pages/${encodeURIComponent(pageId)}/`);
-            return `<article class="script-card page-card" onclick="window.location.assign('${pagePath}')">
-                <div class="card-glow"></div>
+            return `<div class="script-card page-card" onclick="window.location.href='scripts/${encodeURIComponent(pageId)}/index.html'">
                 <div class="card-content">
                     <div class="card-header-section">
-                        <div>
-                            <h3 class="script-title">${utils.escapeHtml(page.title)}</h3>
-                        </div>
+                        <h3 class="script-title">${utils.escapeHtml(page.title)}</h3>
                         ${page.visibility !== 'PUBLIC' ? `<span class="badge badge-${page.visibility.toLowerCase()}">${page.visibility}</span>` : ''}
                     </div>
-                    ${page.description ? `<p class="page-description">${utils.escapeHtml(page.description.substring(0, 170))}${page.description.length > 170 ? '...' : ''}</p>` : ''}
-                    <div class="page-script-preview">${scriptNames || 'No scripts yet.'}</div>
+                    <div class="page-card-count">${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}</div>
+                    ${page.description ? `<p class="page-card-description">${utils.escapeHtml(page.description.substring(0, 160))}${page.description.length > 160 ? '...' : ''}</p>` : ''}
+                    ${scriptNames ? `<div class="page-card-scripts">${scriptNames}${utils.escapeHtml(moreCount)}</div>` : ''}
                     <div class="card-meta">
-                        <span>${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
-                        <span class="page-open">Open <span>→</span></span>
+                        <span>${new Date(page.created).toLocaleDateString('en-US')}</span>
+                        ${page.updated && page.updated !== page.created ? `<span title="Updated">Updated ${new Date(page.updated).toLocaleDateString('en-US')}</span>` : ''}
                     </div>
                 </div>
-            </article>`;
+                <div class="page-card-arrow" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"></path></svg>
+                </div>
+            </div>`;
         }).join('');
     },
 
-    filterLogic(items) {
+    filterLogic(pages) {
         const query = this.searchQuery.toLowerCase();
-        return items.filter(item => {
-            const pageText = `${item.title || ''} ${item.description || ''}`.toLowerCase();
-            const scriptText = (item.scripts || []).map(s => s.name || '').join(' ').toLowerCase();
-            if (query && !pageText.includes(query) && !scriptText.includes(query)) return false;
-            if (item.visibility === 'PRIVATE' && !this.currentUser) return false;
-            if (item.visibility === 'UNLISTED' && !this.currentUser) return false;
-            if (this.currentFilter === 'private' && item.visibility !== 'PRIVATE') return false;
-            if (this.currentFilter === 'public' && item.visibility !== 'PUBLIC') return false;
-            if (this.currentFilter === 'unlisted' && item.visibility !== 'UNLISTED') return false;
+        return pages.filter(page => {
+            const matchesSearch = page.title.toLowerCase().includes(query) ||
+                Object.values(page.scripts || {}).some(script => (script.name || '').toLowerCase().includes(query));
+            if (!matchesSearch) return false;
+            if (page.visibility === 'PRIVATE' && !this.currentUser) return false;
+            if (page.visibility === 'UNLISTED' && !this.currentUser) return false;
+            if (this.currentFilter === 'private' && page.visibility !== 'PRIVATE') return false;
+            if (this.currentFilter === 'public' && page.visibility !== 'PUBLIC') return false;
+            if (this.currentFilter === 'unlisted' && page.visibility !== 'UNLISTED') return false;
             return true;
         });
     },
 
-    sortLogic(items) {
-        return items.sort((a, b) => {
+    sortLogic(pages) {
+        return pages.sort((a, b) => {
             if (this.currentSort === 'newest') return new Date(b.created || 0) - new Date(a.created || 0);
             if (this.currentSort === 'oldest') return new Date(a.created || 0) - new Date(b.created || 0);
-            if (this.currentSort === 'alpha') return (a.title || '').localeCompare(b.title || '');
+            if (this.currentSort === 'alpha') return a.title.localeCompare(b.title);
             if (this.currentSort === 'updated') return new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0);
             return 0;
         });
@@ -816,9 +826,9 @@ const app = {
     filterCategory(cat, e) {
         if (e) {
             e.preventDefault();
-            const target = e.currentTarget || e.target;
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-            if (target?.classList?.contains('sidebar-link')) target.classList.add('active');
+            const link = e.currentTarget || e.target.closest('.sidebar-link');
+            if (link) link.classList.add('active');
         }
         this.currentFilter = cat;
         this.renderList();
@@ -829,346 +839,122 @@ const app = {
         this.renderList();
     },
 
-    setAdminSearch(value) {
-        this.adminSearchQuery = (value || '').trim().toLowerCase();
-        this.renderAdminList();
-    },
-
-    switchAdminTab(tab) {
-        if (tab === 'admin' && !this.currentUser) {
+    switchAdminTab(tab, options = {}) {
+        if (!this.currentUser) {
             location.hash = '';
             return;
         }
+
         document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        const activeKey = (tab === 'create-bot' || tab === 'create-edit') ? 'create' : tab;
-        const activeTab = document.querySelector(`.tab-btn[data-admin-tab="${activeKey}"]`);
+        const navTab = tab === 'create-bot' ? 'bots' : (tab === 'edit' ? 'create' : tab);
+        document.querySelector(`[data-admin-tab="${CSS.escape(navTab)}"]`)?.classList.add('active');
 
         if (tab === 'list') {
             document.getElementById('admin-tab-list').style.display = 'block';
-            activeTab?.classList.add('active');
             this.renderAdminList();
-        } else if (tab === 'snippets') {
-            document.getElementById('admin-tab-snippets').style.display = 'block';
-            activeTab?.classList.add('active');
-            this.renderLuaLibrary();
         } else if (tab === 'bots') {
             document.getElementById('admin-tab-bots').style.display = 'block';
-            activeTab?.classList.add('active');
             this.renderBotsList();
         } else if (tab === 'create-bot') {
             document.getElementById('admin-tab-bot-editor').style.display = 'block';
-            activeTab?.classList.add('active');
-            this.resetBotEditor();
+            if (!options.preserveEditor) this.resetBotEditor();
         } else {
             document.getElementById('admin-tab-editor').style.display = 'block';
-            activeTab?.classList.add('active');
-            if (tab === 'create') this.resetEditor();
-            setTimeout(() => {
-                Object.values(this.pageEditors).forEach(editor => editor.refresh());
-            }, 80);
+            if (tab === 'create' && !options.preserveEditor) this.resetEditor();
+            setTimeout(() => this.initCodeMirror(), 50);
         }
-    },
-
-
-    collectEditorScripts() {
-        const list = document.getElementById('script-editor-list');
-        if (!list) return [];
-        return Array.from(list.querySelectorAll('.script-editor-card')).map((card, index) => {
-            const editorId = card.dataset.editorId;
-            const editor = editorId ? this.pageEditors[editorId] : null;
-            const name = card.querySelector('.script-name-input')?.value.trim() || '';
-            const code = editor ? editor.getValue() : (card.querySelector('.page-code-textarea')?.value || '');
-            return {
-                id: card.dataset.scriptId || utils.sanitizeTitle(name) || `script-${index + 1}`,
-                oldId: card.dataset.scriptId || '',
-                name,
-                code
-            };
-        });
-    },
-
-    makeUniqueScriptIds(scripts, oldPage = null) {
-        const used = new Set();
-        return scripts.map((script, index) => {
-            const previous = oldPage?.scripts?.find(item => item.id === script.oldId);
-            const base = utils.sanitizeTitle(previous?.id || script.id || script.name) || `script-${index + 1}`;
-            let id = base;
-            let n = 2;
-            while (used.has(id)) id = `${base}-${n++}`;
-            used.add(id);
-            return { ...script, id };
-        });
-    },
-
-    async deletePageConfirmation(title) {
-        const page = this.db?.pages?.[title];
-        if (!page || this.actionInProgress) {
-            this.showToast('Page not found.', 'error');
-            return;
-        }
-        let confirmed = false;
-        if (typeof Swal !== 'undefined') {
-            const result = await Swal.fire({
-                title: 'Delete page?',
-                text: `“${page.title}” and all scripts inside it will be deleted.`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Delete Page',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#ef4444'
-            });
-            confirmed = result.isConfirmed;
-        } else {
-            confirmed = confirm(`Delete page “${page.title}”?`);
-        }
-        if (!confirmed) return;
-        this.actionInProgress = true;
-        try {
-            if (typeof NProgress !== 'undefined') NProgress.start();
-            await this.deletePageFiles(page.id, page.scripts || []);
-            delete this.db.pages[title];
-            await this.persistDatabase(`Delete page: ${title}`);
-            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Page deleted successfully.', 'success');
-            await this.loadDatabase();
-            this.switchAdminTab('list');
-        } catch (error) {
-            this.showToast(`Failed to delete page: ${error.message}`, 'error');
-        } finally {
-            this.actionInProgress = false;
-            if (typeof NProgress !== 'undefined') NProgress.done();
-        }
-    },
-
-    async deletePageFiles(pageId, scripts = []) {
-        const paths = [
-            `pages/${pageId}/index.html`,
-            ...(scripts || []).map(script => `pages/${pageId}/raw/${script.filename || `${script.id}.lua`}`),
-            `scripts/${pageId}/index.html`,
-            ...(scripts || []).map(script => `scripts/${pageId}/raw/${script.filename || `${script.id}.lua`}`)
-        ];
-        for (const path of paths) await this.deleteRemoteFile(path);
-    },
-
-    resetSnippetEditor() {
-        const id = document.getElementById('snippet-id');
-        const title = document.getElementById('snippet-title');
-        const desc = document.getElementById('snippet-desc');
-        const code = document.getElementById('snippet-code');
-        const heading = document.getElementById('snippet-editor-heading');
-        const button = document.getElementById('snippet-save-btn');
-        if (id) id.value = '';
-        if (title) title.value = '';
-        if (desc) desc.value = '';
-        if (code) code.value = '';
-        if (heading) heading.textContent = 'Add Lua Snippet';
-        if (button) button.textContent = 'Save Snippet';
-        this.renderLuaLibrary();
-    },
-
-    renderLuaLibrary() {
-        const list = document.getElementById('lua-snippet-list');
-        if (!list || !this.db) return;
-        const query = (document.getElementById('snippet-search')?.value || '').trim().toLowerCase();
-        const snippets = Object.values(this.db.luaSnippets || {})
-            .filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query))
-            .sort((a,b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
-        if (!snippets.length) {
-            list.innerHTML = `<div class="library-empty"><div class="library-empty-icon">LUA</div><h4>${query ? 'Snippet not found' : 'No Lua snippets yet'}</h4><p>Save frequently used code once, then insert it into any script.</p></div>`;
-            return;
-        }
-        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Reusable Lua snippet.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Edit</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Delete</button></div></article>`).join('');
-    },
-
-    editLuaSnippet(encodedId) {
-        const id = decodeURIComponent(encodedId);
-        const item = this.db?.luaSnippets?.[id];
-        if (!item) return this.showToast('Lua snippet not found.', 'error');
-        document.getElementById('snippet-id').value = item.id;
-        document.getElementById('snippet-title').value = item.name || '';
-        document.getElementById('snippet-desc').value = item.description || '';
-        document.getElementById('snippet-code').value = item.code || '';
-        document.getElementById('snippet-editor-heading').textContent = `Edit: ${item.name}`;
-        document.getElementById('snippet-save-btn').textContent = 'Update Snippet';
-        this.switchAdminTab('snippets');
-        document.getElementById('snippet-title')?.focus();
-    },
-
-    async saveLuaSnippet() {
-        if (!this.currentUser || !this.db || this.actionInProgress) return;
-        const idEl = document.getElementById('snippet-id');
-        const title = document.getElementById('snippet-title')?.value.trim() || '';
-        const description = document.getElementById('snippet-desc')?.value.trim() || '';
-        const code = document.getElementById('snippet-code')?.value || '';
-        const existingId = idEl?.value.trim() || '';
-        if (!title) return this.showToast('Snippet name is required.', 'error');
-        const codeError = utils.validateCode(code);
-        if (codeError) return this.showToast(codeError, 'error');
-        this.actionInProgress = true;
-        const button = document.getElementById('snippet-save-btn');
-        if (button) { button.disabled = true; button.textContent = 'Saving...'; }
-        try {
-            const base = utils.sanitizeTitle(title) || `potongan-${Date.now()}`;
-            let id = existingId || base;
-            if (!existingId) { let n = 2; while (this.db.luaSnippets[id]) id = `${base}-${n++}`; }
-            const now = new Date().toISOString();
-            this.db.luaSnippets[id] = { id, name: title, description, code, created: this.db.luaSnippets[id]?.created || now, updated: now };
-            if (existingId && existingId !== id) delete this.db.luaSnippets[existingId];
-            await this.persistDatabase(`${existingId ? 'Update' : 'Add'} Lua snippet: ${title}`);
-            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Lua snippet saved successfully.', 'success');
-            this.resetSnippetEditor();
-            this.renderAdminList();
-        } catch (error) {
-            this.showToast(`Failed to save snippet: ${error.message}`, 'error');
-        } finally {
-            this.actionInProgress = false;
-            if (button) { button.disabled = false; button.textContent = existingId ? 'Update Snippet' : 'Save Snippet'; }
-        }
-    },
-
-    async deleteLuaSnippet(encodedId) {
-        const id = decodeURIComponent(encodedId);
-        const item = this.db?.luaSnippets?.[id];
-        if (!item || this.actionInProgress) return;
-        let confirmed = false;
-        if (typeof Swal !== 'undefined') {
-            confirmed = (await Swal.fire({ title: 'Delete Lua snippet?', text: `“${item.name}” will be removed from the library.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', cancelButtonText: 'Cancel', confirmButtonColor: '#ef4444' })).isConfirmed;
-        } else confirmed = confirm(`Delete snippet “${item.name}”?`);
-        if (!confirmed) return;
-        this.actionInProgress = true;
-        try {
-            delete this.db.luaSnippets[id];
-            await this.persistDatabase(`Delete Lua snippet: ${item.name}`);
-            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Lua snippet deleted successfully.', 'success');
-            this.resetSnippetEditor();
-            this.renderAdminList();
-        } catch (error) {
-            this.showToast(`Failed to delete snippet: ${error.message}`, 'error');
-        } finally { this.actionInProgress = false; }
-    },
-
-    openInsertLuaModal(editorId) {
-        this.insertTargetEditorId = editorId;
-        const modal = document.getElementById('lua-insert-modal');
-        if (!modal) return;
-        if (document.getElementById('insert-lua-search')) document.getElementById('insert-lua-search').value = '';
-        this.renderInsertLuaList();
-        modal.style.display = 'flex';
-        requestAnimationFrame(() => document.getElementById('insert-lua-search')?.focus());
-    },
-
-    closeInsertLuaModal() {
-        const modal = document.getElementById('lua-insert-modal');
-        if (modal) modal.style.display = 'none';
-        this.insertTargetEditorId = null;
-    },
-
-    renderInsertLuaList() {
-        const list = document.getElementById('insert-lua-list');
-        if (!list) return;
-        const query = (document.getElementById('insert-lua-search')?.value || '').trim().toLowerCase();
-        const items = Object.values(this.db?.luaSnippets || {}).filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query));
-        list.innerHTML = items.length ? items.map(item => `<button type="button" class="insert-lua-item" onclick="app.insertLuaSnippet('${encodeURIComponent(item.id)}')"><span class="insert-lua-item-icon">L</span><span><strong>${utils.escapeHtml(item.name)}</strong><small>${utils.escapeHtml(item.description || 'No description')}</small></span></button>`).join('') : `<div class="library-empty compact"><h4>${query ? 'No results' : 'No Lua snippets yet'}</h4><p>Create a snippet in the Lua Library first.</p></div>`;
-    },
-
-    insertLuaSnippet(encodedId) {
-        const item = this.db?.luaSnippets?.[decodeURIComponent(encodedId)];
-        const editor = this.insertTargetEditorId ? this.pageEditors[this.insertTargetEditorId] : null;
-        if (!item || !editor) {
-            this.closeInsertLuaModal();
-            return this.showToast('Editor or Lua snippet not found.', 'error');
-        }
-        editor.replaceSelection(item.code + (item.code.endsWith('\n') ? '' : '\n'));
-        editor.focus();
-        this.closeInsertLuaModal();
-        this.showToast(`“${item.name}” inserted successfully.`, 'success');
     },
 
     async renderAdminList() {
         if (!this.currentUser || !this.db) return;
-        this.normalizeDatabase();
         const list = document.getElementById('admin-list');
-        const pages = Object.entries(this.db.pages || {}).map(([title, data]) => ({ title, ...data }));
-        const query = this.adminSearchQuery;
-        const filtered = query ? pages.filter(page => {
-            const haystack = `${page.title} ${page.description || ''} ${(page.scripts || []).map(s => s.name).join(' ')}`.toLowerCase();
-            return haystack.includes(query);
-        }) : pages;
-        const sorted = filtered.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
-        const botsCount = Object.keys(this.db.bots || {}).length;
-        const totalScripts = pages.reduce((sum, page) => sum + (page.scripts || []).length, 0);
-        document.getElementById('total-stats').textContent = `${pages.length} page · ${totalScripts} script · ${botsCount} bot`; 
-        const pageCountEl = document.getElementById('pages-count');
-        const scriptCountEl = document.getElementById('scripts-count');
-        if (pageCountEl) pageCountEl.textContent = pages.length;
-        if (scriptCountEl) scriptCountEl.textContent = totalScripts;
-        const publicPagesCountEl = document.getElementById('public-pages-count');
-        if (publicPagesCountEl) publicPagesCountEl.textContent = pages.filter(page => page.visibility === 'PUBLIC').length;
-        const snippetsCountEl = document.getElementById('snippets-count');
-        if (snippetsCountEl) snippetsCountEl.textContent = Object.keys(this.db.luaSnippets || {}).length;
+        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ id, ...data }));
+        const sorted = pages.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
+        const scriptTotal = sorted.reduce((sum, page) => sum + Object.keys(page.scripts || {}).length, 0);
+
+        document.getElementById('total-stats').textContent = `${sorted.length} ${sorted.length === 1 ? 'Page' : 'Pages'} · ${scriptTotal} ${scriptTotal === 1 ? 'Script' : 'Scripts'}`;
+        this.renderAdminStats();
 
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-admin-state">
-                <div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                <p>${query ? 'No pages match your search.' : 'No pages yet. Click “New Page” to create your first page.'}</p>
+            list.innerHTML = `<div class="empty-admin-state modern-empty">
+                <div class="empty-icon">+</div>
+                <h3>No pages yet</h3>
+                <p>Create a page and add one or more named scripts to start building your library.</p>
+                <button class="btn btn-sm" onclick="app.switchAdminTab('create')">Create First Page</button>
             </div>`;
             return;
         }
 
         list.innerHTML = sorted.map(page => {
+            const scripts = Object.values(page.scripts || {});
             const updated = page.updated ? new Date(page.updated).toLocaleDateString('en-US') : new Date(page.created).toLocaleDateString('en-US');
-            const scriptsCount = (page.scripts || []).length;
-            const pagePayload = encodeURIComponent(page.title);
-            return `<div class="admin-item page-admin-item" data-page-title="${utils.escapeHtml(page.title)}" onclick="app.populateEditor(decodeURIComponent('${pagePayload}'))">
-                <div class="admin-item-main">
-                    <div class="admin-item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                    <div class="admin-item-left">
+            const names = scripts.slice(0, 4).map(script => `<span class="script-chip">${utils.escapeHtml(script.name)}</span>`).join('');
+            const extra = scripts.length > 4 ? `<span class="script-chip script-chip-muted">+${scripts.length - 4}</span>` : '';
+
+            return `<div class="admin-item modern-admin-item" data-page-title="${utils.escapeHtml(page.title)}" data-page-id="${utils.escapeHtml(page.id)}" onclick="app.populateEditor('${String(page.id).replace(/'/g, "\'")}')">
+                <div class="admin-item-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                        <path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"></path>
+                        <path d="M4 5.5v16"></path>
+                    </svg>
+                </div>
+                <div class="admin-item-left">
+                    <div class="admin-item-title-row">
                         <strong>${utils.escapeHtml(page.title)}</strong>
-                        <div class="admin-meta">
-                            <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
-                            <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}${scriptsCount === 1 ? '' : 's'}</span>
-                            <span class="text-muted">Updated ${updated}</span>
-                        </div>
+                        <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
+                    </div>
+                    ${page.description ? `<p class="admin-description">${utils.escapeHtml(page.description.substring(0, 150))}${page.description.length > 150 ? '...' : ''}</p>` : ''}
+                    <div class="admin-script-chips">${names}${extra}</div>
+                    <div class="admin-meta">
+                        <span>${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}</span>
+                        <span class="text-muted">Updated ${updated}</span>
                     </div>
                 </div>
-                <div class="admin-item-actions">
-                    <button class="icon-btn danger" title="Delete page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
-                    </button>
-                    <span class="admin-open-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
+                <div class="admin-item-right">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
+                <div class="swipe-hint">Swipe to delete</div>
             </div>`;
         }).join('');
-    },
 
+        this.initSwipeToDelete();
+    },
 
     renderBotsList() {
         if (!this.currentUser || !this.db) return;
         const list = document.getElementById('bots-list');
         const bots = Object.entries(this.db.bots || {}).map(([id, data]) => ({ id, ...data }));
         const sorted = bots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
-        
+
+        const botCount = document.getElementById('admin-bot-count');
+        if (botCount) botCount.textContent = sorted.length;
+
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-admin-state"><p>No bots yet. Click “New Bot” to add one.</p></div>`;
+            list.innerHTML = `<div class="empty-admin-state modern-empty"><h3>No bot posts yet</h3><p>Create a Discord post or schedule one for later.</p><button class="btn btn-sm" onclick="app.switchAdminTab('create-bot')">Create Bot Post</button></div>`;
             return;
         }
-        
+
         list.innerHTML = sorted.map(b => {
-            let status = 'Waiting', statusClass = 'status-pending', timeInfo = 'Waiting';
-            if (b.cancelled) { status = 'Canceled'; statusClass = 'status-cancelled'; } 
-            else if (b.sent) { status = 'Sent'; statusClass = 'status-sent'; timeInfo = `Sent: ${new Date(b.sentTime).toLocaleString('en-US')}`; } 
+            let status = 'Pending', statusClass = 'status-pending', timeInfo = 'Pending';
+            if (b.cancelled) { status = 'Cancelled'; statusClass = 'status-cancelled'; }
+            else if (b.sent) { status = 'Sent'; statusClass = 'status-sent'; timeInfo = `Sent: ${new Date(b.sentTime).toLocaleString('en-US')}`; }
             else if (b.scheduled) { status = 'Scheduled'; statusClass = 'status-scheduled'; timeInfo = `Scheduled: ${utils.formatDisplayTime(b.scheduledTime, b.timezone)}`; }
-            
-            return `<div class="admin-item" data-bot-id="${b.id}" onclick="app.populateBotEditor('${b.id}')">
+
+            return `<div class="admin-item modern-admin-item" data-bot-id="${utils.escapeHtml(b.id)}" onclick="app.populateBotEditor('${String(b.id).replace(/'/g, "\'")}')">
+                <div class="admin-item-icon bot-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7">
+                        <rect x="4" y="7" width="16" height="12" rx="3"></rect>
+                        <path d="M8 7V4M16 7V4M12 4v-2M8 13h.01M16 13h.01M9 16h6"></path>
+                    </svg>
+                </div>
                 <div class="admin-item-left">
-                    <strong>${utils.escapeHtml(b.title)}</strong>
-                    <div class="admin-meta">
+                    <div class="admin-item-title-row">
+                        <strong>${utils.escapeHtml(b.title)}</strong>
                         <span class="bot-status ${statusClass}">${status}</span>
-                        <span class="text-muted">${timeInfo}</span>
                     </div>
+                    <p class="admin-description">${utils.escapeHtml((b.message || '').substring(0, 150))}${(b.message || '').length > 150 ? '...' : ''}</p>
+                    <div class="admin-meta"><span>${timeInfo}</span></div>
                 </div>
                 <div class="admin-item-right">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
@@ -1216,9 +1002,9 @@ const app = {
                     item.classList.add('swipe-delete');
                     
                     setTimeout(() => {
-                        const scriptTitle = item.getAttribute('data-script-title');
+                        const pageId = item.getAttribute('data-page-id');
                         const botId = item.getAttribute('data-bot-id');
-                        if (scriptTitle) this.deleteScriptConfirmation(scriptTitle);
+                        if (pageId) this.deletePageConfirmation(pageId);
                         else if (botId) this.deleteBotConfirmation(botId);
                     }, 300);
                 } else {
@@ -1235,30 +1021,31 @@ const app = {
         });
     },
 
-    async deleteScriptConfirmation(scriptTitle) {
-        if (!scriptTitle || !this.db.scripts[scriptTitle]) {
-            this.showToast('Script not found.', 'error');
+    async deletePageConfirmation(pageId) {
+        if (!pageId || !this.db?.pages?.[pageId]) {
+            this.showToast('Page not found.', 'error');
             await this.loadDatabase();
             return;
         }
 
+        const page = this.db.pages[pageId];
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Delete Script',
-                text: `Are you sure you want to delete “${scriptTitle}”?`,
+                title: 'Delete Page',
+                text: `Delete "${page.title}" and all ${Object.keys(page.scripts || {}).length} script files?`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Delete',
-                cancelButtonText: 'Cancel',
+                confirmButtonText: 'Delete Page',
+                cancelButtonText: 'Keep Page',
                 confirmButtonColor: '#ef4444'
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Are you sure you want to delete “${scriptTitle}”?`);
+            shouldDelete = confirm(`Delete "${page.title}" and all of its scripts?`);
         }
 
-        if (shouldDelete) await this.deleteScriptLogic(scriptTitle);
+        if (shouldDelete) await this.deletePageLogic(pageId);
         else await this.loadDatabase();
     },
 
@@ -1270,7 +1057,7 @@ const app = {
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
                 title: 'Cancel Bot',
-                text: `Are you sure you want to cancel “${bot.title}”?`,
+                text: `Are you sure you want to cancel "${bot.title}"?`,
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Cancel Bot',
@@ -1279,35 +1066,27 @@ const app = {
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Are you sure you want to cancel bot “${bot.title}”?`);
+            shouldDelete = confirm(`Cancel bot "${bot.title}"?`);
         }
 
         if (shouldDelete) await this.deleteBotLogic(botId);
         else await this.loadDatabase();
     },
 
-    async deleteScriptLogic(scriptTitle) {
+    async deletePageLogic(pageId) {
         if (this.actionInProgress) return;
         this.actionInProgress = true;
 
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
+            const page = this.db.pages[pageId];
+            if (!page) throw new Error('Page not found');
 
-            const script = this.db.scripts[scriptTitle];
-            if (!script) throw new Error('Script not found.');
-
-            const scriptId = utils.sanitizeTitle(scriptTitle);
-
-            // database.json may have been loaded from local cache, so always
-            // fetch the latest remote SHA before updating it.
             this.dbSha = await this.getRemoteDatabaseSha();
-
-            // Delete the generated files first. If one fails, stop before
-            // changing database.json so the database does not lie about files.
-            await this.deleteScriptFiles(scriptId, script.filename);
+            await this.deletePageFiles(pageId, page);
 
             const nextDb = JSON.parse(JSON.stringify(this.db));
-            delete nextDb.scripts[scriptTitle];
+            delete nextDb.pages[pageId];
 
             const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
                 method: 'PUT',
@@ -1318,7 +1097,7 @@ const app = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: `Remove ${scriptTitle}`,
+                    message: `Remove page ${page.title}`,
                     content: utils.safeBtoa(JSON.stringify(nextDb, null, 2)),
                     sha: this.dbSha,
                     branch: CONFIG.branch
@@ -1335,7 +1114,7 @@ const app = {
             }
 
             const newDbData = await dbRes.json();
-            this.db = nextDb;
+            this.db = this.normalizeDatabase(nextDb);
             this.dbSha = newDbData.content.sha;
 
             try {
@@ -1344,12 +1123,19 @@ const app = {
                 console.warn('Could not persist local database cache:', storageError);
             }
 
-            this.showToast('Script deleted', 'success');
-            await this.loadDatabase();
+            if (this.currentEditingId === pageId) {
+                this.currentEditingId = null;
+                this.originalPageId = null;
+                this.originalTitle = null;
+            }
 
+            this.showToast('Page deleted.', 'success');
+            this.renderAdminStats();
+            this.switchAdminTab('list');
+            this.renderList();
         } catch (e) {
-            console.error('Delete error:', e);
-            this.showToast(`An error occurred: ${e.message}`, 'error');
+            console.error('Delete page error:', e);
+            this.showToast(`Error: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1357,15 +1143,14 @@ const app = {
         }
     },
 
-    async deleteScriptFiles(scriptId, filename) {
-        const filesToDelete = [
-            `scripts/${scriptId}/index.html`,
-            `scripts/${scriptId}/raw/${filename}`
-        ];
+    async deletePageFiles(pageId, pageData) {
+        const filesToDelete = [`scripts/${pageId}/index.html`];
+        Object.values(pageData?.scripts || {}).forEach(script => {
+            filesToDelete.push(`scripts/${pageId}/raw/${script.filename || `${script.id}.lua`}`);
+        });
 
-        for (const path of filesToDelete) {
+        for (const path of [...new Set(filesToDelete)]) {
             const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-
             const res = await fetch(url, {
                 headers: {
                     'Authorization': `Bearer ${this.token}`,
@@ -1374,20 +1159,17 @@ const app = {
                 }
             });
 
-            // Missing file is harmless.
             if (res.status === 404) continue;
-
             if (!res.ok) {
                 let detail = `HTTP ${res.status}`;
                 try {
                     const body = await res.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Failed to read ${path} — ${detail}.`);
+                throw new Error(`Cannot read ${path} — ${detail}`);
             }
 
             const fileData = await res.json();
-
             const deleteRes = await fetch(url, {
                 method: 'DELETE',
                 headers: {
@@ -1397,7 +1179,7 @@ const app = {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    message: `Delete script file: ${path}`,
+                    message: `Delete page file: ${path}`,
                     sha: fileData.sha,
                     branch: CONFIG.branch
                 })
@@ -1409,8 +1191,42 @@ const app = {
                     const body = await deleteRes.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Failed to delete ${path} — ${detail}.`);
+                throw new Error(`Cannot delete ${path} — ${detail}`);
             }
+        }
+    },
+
+    async deleteObsoleteScriptFiles(pageId, oldPage, newPage) {
+        const newFilenames = new Set(Object.values(newPage?.scripts || {}).map(s => s.filename || `${s.id}.lua`));
+        const obsolete = Object.values(oldPage?.scripts || {}).filter(s => !newFilenames.has(s.filename || `${s.id}.lua`));
+
+        for (const script of obsolete) {
+            const path = `scripts/${pageId}/raw/${script.filename || `${script.id}.lua`}`;
+            const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
+            const res = await fetch(url, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10'
+                }
+            });
+            if (res.status === 404) continue;
+            if (!res.ok) continue;
+            const fileData = await res.json();
+            await fetch(url, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `Remove obsolete script file: ${path}`,
+                    sha: fileData.sha,
+                    branch: CONFIG.branch
+                })
+            });
         }
     },
 
@@ -1445,12 +1261,12 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Bot canceled.', 'success');
+                    this.showToast('Bot cancelled', 'success');
                     await this.loadDatabase();
-                } else throw new Error('Failed to update the database.');
+                } else throw new Error('Failed to update database');
             }
         } catch(e) {
-            this.showToast(`An error occurred: ${e.message}`, 'error');
+            this.showToast(`Error: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1459,143 +1275,201 @@ const app = {
     },
 
     resetEditor() {
-        this.currentEditingPageTitle = null;
+        this.destroyCodeMirrorEditors();
+        this.currentEditingId = null;
         this.originalTitle = null;
         this.originalPageId = null;
-        this.destroyPageEditors();
         const heading = document.getElementById('editor-heading');
-        const saveBtn = document.getElementById('page-save-btn');
-        if (heading) heading.textContent = 'New Page';
-        if (saveBtn) saveBtn.textContent = 'Publish Page';
-        const status = document.getElementById('page-editor-status');
-        if (status) status.textContent = 'Draft';
-        const title = document.getElementById('edit-title');
-        const visibility = document.getElementById('edit-visibility');
-        const desc = document.getElementById('edit-desc');
+        if (heading) heading.textContent = 'Create New Page';
+        const title = document.getElementById('edit-page-title');
         if (title) title.value = '';
+        const visibility = document.getElementById('edit-visibility');
         if (visibility) visibility.value = 'PUBLIC';
+        const desc = document.getElementById('edit-desc');
         if (desc) desc.value = '';
-        const list = document.getElementById('script-editor-list');
-        if (list) list.innerHTML = '';
-        this.addScriptEditor();
+
+        const builder = document.getElementById('script-builder');
+        if (builder) builder.innerHTML = '';
+        this.scriptDraftCounter = 0;
+        this.addScriptBlock({ name: '', code: '' });
+
+        const saveBtn = document.querySelector('.editor-footer .btn-primary');
+        if (saveBtn) saveBtn.textContent = 'Publish Page';
+        this.updateScriptCountLabel();
     },
 
-    updateScriptEditorCount() {
-        const list = document.getElementById('script-editor-list');
-        const countEl = document.getElementById('script-editor-count');
-        const count = list ? list.querySelectorAll('.script-editor-card').length : 0;
-        if (countEl) countEl.textContent = `${count} script${count === 1 ? '' : 's'}`;
+    createScriptEntryId() {
+        this.scriptDraftCounter += 1;
+        return `draft-${Date.now()}-${this.scriptDraftCounter}`;
     },
 
-    addScriptEditor(script = null, code = '') {
-        const list = document.getElementById('script-editor-list');
-        if (!list) return null;
-        this.pageEditorCounter += 1;
-        const editorId = `page-editor-${Date.now()}-${this.pageEditorCounter}`;
-        const card = document.createElement('div');
-        card.className = 'script-editor-card';
-        card.dataset.editorId = editorId;
-        if (script?.id) card.dataset.scriptId = script.id;
-        if (script?.filename) card.dataset.filename = script.filename;
-        card.innerHTML = `
-            <div class="script-editor-card-head">
-                <div class="script-index-badge">SCRIPT</div>
-                <div class="script-editor-card-title-wrap">
-                    <input type="text" class="input-field script-name-input" placeholder="Script Name" value="${utils.escapeHtml(script?.name || '')}">
+    addScriptBlock(data = {}) {
+        const builder = document.getElementById('script-builder');
+        if (!builder) return;
+        const entryId = data.id || this.createScriptEntryId();
+        const safeEntryId = utils.escapeHtml(entryId);
+        const safeName = utils.escapeHtml(data.name || '');
+        builder.insertAdjacentHTML('beforeend', `
+            <section class="script-entry" data-entry-id="${safeEntryId}">
+                <div class="script-entry-header">
+                    <div class="script-entry-index">
+                        <span class="script-index-number">${builder.children.length + 1}</span>
+                        <div>
+                            <span class="section-kicker">Script</span>
+                            <strong>Named source block</strong>
+                        </div>
+                    </div>
+                    <div class="script-entry-actions">
+                        <span class="script-size-label">${(data.code || '').length.toLocaleString()} characters</span>
+                        <button type="button" class="icon-btn" title="Remove script" aria-label="Remove script" onclick="app.removeScriptBlock('${safeEntryId}')">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                                <path d="M5 7h14M10 11v6M14 11v6M9 7V4h6v3M7 7l1 13h8l1-13"></path>
+                            </svg>
+                        </button>
+                    </div>
                 </div>
-                <button class="icon-btn danger remove-script-btn" type="button" title="Delete script" aria-label="Delete script">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
-                </button>
-            </div>
-            <div class="script-editor-card-body">
-                <div class="script-editor-toolbar">
-                    <span class="editor-file-badge">.lua</span>
-                    <button class="btn btn-secondary btn-xs insert-lua-btn" type="button">Insert Lua</button>
+                <div class="script-entry-name-row">
+                    <div class="form-group">
+                        <label>Script Name</label>
+                        <input type="text" class="input-field script-name-input" placeholder="e.g. ESP System" value="${safeName}" maxlength="100">
+                        <small class="field-hint">This name identifies the script inside the page.</small>
+                    </div>
+                    <div class="script-file-preview">
+                        <span>Raw file</span>
+                        <code class="script-filename-preview">${utils.escapeHtml((utils.sanitizeTitle(data.name || 'script') || 'script') + '.lua')}</code>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label>Lua Code</label>
-                    <textarea class="input-field page-code-textarea" data-editor-id="${editorId}">${utils.escapeHtml(code)}</textarea>
+                <div class="form-group script-code-group">
+                    <div class="script-code-label-row">
+                        <label>Lua Source</label>
+                        <span>Lua</span>
+                    </div>
+                    <textarea class="input-field code-textarea script-code-textarea" aria-label="Lua source">${utils.escapeHtml(data.code || '')}</textarea>
                 </div>
-            </div>`;
-        card.querySelector('.insert-lua-btn').addEventListener('click', () => this.openInsertLuaModal(editorId));
-        card.querySelector('.remove-script-btn').addEventListener('click', event => {
-            event.stopPropagation();
-            if (list.querySelectorAll('.script-editor-card').length <= 1) {
-                this.showToast('A page must contain at least one script.', 'warning');
-                return;
-            }
-            const editor = this.pageEditors[editorId];
-            if (editor) {
-                try { editor.toTextArea(); } catch (_) {}
-                delete this.pageEditors[editorId];
-            }
-            card.remove();
-            this.updateScriptEditorCount();
+            </section>
+        `);
+
+        const nameInput = builder.lastElementChild.querySelector('.script-name-input');
+        nameInput.addEventListener('input', () => {
+            const preview = builder.lastElementChild?.querySelector('.script-filename-preview');
+            if (preview) preview.textContent = `${utils.sanitizeTitle(nameInput.value.trim()) || 'script'}.lua`;
         });
-        list.appendChild(card);
-        const textarea = card.querySelector('.page-code-textarea');
-        this.initPageCodeEditor(editorId, textarea);
-        this.updateScriptEditorCount();
-        return editorId;
+
+        setTimeout(() => this.initCodeMirror(), 20);
+        this.updateScriptCountLabel();
     },
 
-    async populateEditor(title) {
-        if (!this.currentUser || !this.db?.pages?.[title]) {
-            this.normalizeDatabase();
-        }
-        if (!this.db?.pages?.[title]) {
-            this.showToast('Page not found.', 'error');
+    removeScriptBlock(entryId) {
+        const builder = document.getElementById('script-builder');
+        const entry = builder?.querySelector(`.script-entry[data-entry-id="${CSS.escape(entryId)}"]`);
+        if (!builder || !entry) return;
+        if (builder.children.length <= 1) {
+            this.showToast('A page must contain at least one script.', 'error');
             return;
         }
-        const page = this.db.pages[title];
-        this.currentEditingPageTitle = title;
-        this.originalTitle = title;
-        this.originalPageId = page.id || utils.sanitizeTitle(title);
-        this.destroyPageEditors();
-        this.switchAdminTab('create-edit');
-        const heading = document.getElementById('editor-heading');
-        const saveBtn = document.getElementById('page-save-btn');
-        const status = document.getElementById('page-editor-status');
-        if (heading) heading.textContent = `Edit: ${page.title}`;
-        if (saveBtn) saveBtn.textContent = 'Update Page';
-        if (status) status.textContent = 'Editing';
-        document.getElementById('edit-title').value = page.title || '';
+        const editor = this.cmEditors[entryId];
+        if (editor) {
+            try { editor.toTextArea(); } catch (_) {}
+            delete this.cmEditors[entryId];
+        }
+        entry.remove();
+        this.renumberScriptEntries();
+        this.updateScriptCountLabel();
+    },
+
+    duplicateScriptBlock(entryId) {
+        const entry = document.querySelector(`.script-entry[data-entry-id="${CSS.escape(entryId)}"]`);
+        if (!entry) return;
+        const name = entry.querySelector('.script-name-input')?.value || '';
+        const editor = this.cmEditors[entryId];
+        const code = editor ? editor.getValue() : (entry.querySelector('.script-code-textarea')?.value || '');
+        this.addScriptBlock({ name: `${name} Copy`, code });
+    },
+
+    renumberScriptEntries() {
+        document.querySelectorAll('#script-builder .script-entry').forEach((entry, index) => {
+            const badge = entry.querySelector('.script-index-number');
+            if (badge) badge.textContent = index + 1;
+        });
+    },
+
+    updateScriptCountLabel() {
+        const count = document.querySelectorAll('#script-builder .script-entry').length;
+        const label = document.getElementById('script-count-label');
+        if (label) label.textContent = `${count} ${count === 1 ? 'script' : 'scripts'}`;
+    },
+
+    collectPageScripts() {
+        return [...document.querySelectorAll('#script-builder .script-entry')].map(entry => {
+            const entryId = entry.dataset.entryId;
+            const name = entry.querySelector('.script-name-input')?.value.trim() || '';
+            const editor = this.cmEditors[entryId];
+            const code = editor ? editor.getValue() : (entry.querySelector('.script-code-textarea')?.value || '');
+            return {
+                entryId,
+                name,
+                code
+            };
+        });
+    },
+
+    async populateEditor(pageId) {
+        if (!this.currentUser || !this.db?.pages?.[pageId]) return;
+        const page = this.db.pages[pageId];
+
+        this.destroyCodeMirrorEditors();
+        this.currentEditingId = pageId;
+        this.originalTitle = page.title;
+        this.originalPageId = pageId;
+
+        document.getElementById('editor-heading').textContent = `Edit: ${page.title}`;
+        document.getElementById('edit-page-title').value = page.displayTitle || page.title;
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
         document.getElementById('edit-desc').value = page.description || '';
 
-        const list = document.getElementById('script-editor-list');
-        list.innerHTML = '';
-        const scripts = Array.isArray(page.scripts) ? page.scripts : [];
-        if (!scripts.length) {
-            this.addScriptEditor();
-            return;
-        }
-        for (const script of scripts) {
-            let code = '';
-            try {
-                const folder = page.legacy ? 'scripts' : 'pages';
-                const path = `${folder}/${encodeURIComponent(page.id || utils.sanitizeTitle(title))}/raw/${encodeURIComponent(script.filename)}`;
-                const res = await fetch(path, { cache: 'no-store' });
-                if (res.ok) code = await res.text();
-            } catch (error) {
-                console.warn('Could not load script source:', script.name, error);
-            }
-            this.addScriptEditor(script, code);
-        }
-        Object.values(this.pageEditors).forEach(editor => editor.refresh());
-    },
+        const builder = document.getElementById('script-builder');
+        if (builder) builder.innerHTML = '';
+        this.scriptDraftCounter = 0;
 
-    resetBotEditor() {
-        document.getElementById('bot-editor-heading').textContent = 'New Bot';
-        document.getElementById('bot-title').value = '';
-        document.getElementById('bot-message').value = '';
-        document.getElementById('bot-schedule').checked = false;
-        document.getElementById('bot-schedule-time').value = '';
-        document.getElementById('bot-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        const saveBtn = document.querySelector('.bot-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = 'Send Bot';
-        this.currentBotId = null;
-        this.toggleScheduleFields();
+        const scripts = Object.values(page.scripts || {});
+        if (!scripts.length) {
+            this.addScriptBlock({ name: '', code: '' });
+        } else {
+            scripts.forEach(script => this.addScriptBlock({
+                id: script.id,
+                name: script.displayName || script.name,
+                code: ''
+            }));
+        }
+
+        this.switchAdminTab('edit', { preserveEditor: true });
+
+        if (typeof NProgress !== 'undefined') NProgress.start();
+        try {
+            await Promise.all(Object.values(page.scripts || {}).map(async script => {
+                const rawUrl = `${CONFIG.pagesBaseUrl()}scripts/${encodeURIComponent(page.id)}/raw/${encodeURIComponent(script.filename || `${script.id}.lua`)}`;
+                const res = await fetch(rawUrl, { cache: 'no-store' });
+                if (!res.ok) return;
+                const code = await res.text();
+                const editor = this.cmEditors[script.id];
+                if (editor) editor.setValue(code);
+                else {
+                    const entry = document.querySelector(`.script-entry[data-entry-id="${CSS.escape(script.id)}"]`);
+                    const textarea = entry?.querySelector('.script-code-textarea');
+                    if (textarea) textarea.value = code;
+                }
+            }));
+        } catch (e) {
+            console.error('Load error:', e);
+            this.showToast('Some script sources could not be loaded.', 'warning');
+        } finally {
+            if (typeof NProgress !== 'undefined') NProgress.done();
+            this.updateScriptCountLabel();
+            setTimeout(() => this.initCodeMirror(), 50);
+        }
+
+        const saveBtn = document.querySelector('.editor-footer .btn-primary');
+        if (saveBtn) saveBtn.textContent = 'Update Page';
     },
 
     async populateBotEditor(botId) {
@@ -1603,7 +1477,7 @@ const app = {
         const bot = this.db.bots[botId];
         
         if (bot.sent) {
-            this.showToast('A sent post cannot be edited.', 'error');
+            this.showToast('Cannot edit sent posts', 'error');
             this.switchAdminTab('bots');
             return;
         }
@@ -1628,335 +1502,451 @@ const app = {
         this.toggleScheduleFields();
     },
 
-    githubHeaders() {
-        return {
-            'Authorization': `Bearer ${this.token}`,
-            'Accept': 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2026-03-10',
-            'Content-Type': 'application/json'
-        };
-    },
-
-    explainGithubError(status, body = {}) {
-        const message = body?.message || '';
-        if (status === 401) return 'The GitHub token is invalid, expired, or unusable.';
-        if (status === 403) return 'GitHub access was denied. Make sure the token has Contents: Read and write permission for the repository.';
-        if (status === 404) return 'Repository or file not found. Check the repository name and branch.';
-        if (status === 409) return 'A GitHub change conflict occurred. The latest data will be reloaded; try publishing again.';
-        if (status === 422) return `GitHub rejected the request. ${message || 'Check the request data and target branch.'}`;
-        if (status >= 500) return `GitHub is experiencing a problem (HTTP ${status}). Try again in a moment.`;
-        return message ? `GitHub: ${message} (HTTP ${status}).` : `GitHub returned HTTP ${status}.`;
-    },
-
     async getRemoteDatabaseSha() {
         const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json?ref=${encodeURIComponent(CONFIG.branch)}&t=${CONFIG.cacheBuster()}`;
         const res = await fetch(url, {
-            headers: this.githubHeaders(),
+            headers: {
+                'Authorization': `Bearer ${this.token}`,
+                'Accept': 'application/vnd.github+json',
+                'X-GitHub-Api-Version': '2026-03-10'
+            },
             cache: 'no-store'
         });
         if (!res.ok) {
-            let body = {};
-            try { body = await res.json(); } catch (_) {}
-            throw new Error(this.explainGithubError(res.status, body) + ' Database: database.json.');
+            let detail = `HTTP ${res.status}`;
+            try {
+                const body = await res.json();
+                if (body?.message) detail += `: ${body.message}`;
+            } catch (_) {}
+            throw new Error(`Failed to access remote database — ${detail}`);
         }
         const file = await res.json();
         return file.sha;
     },
 
-    async saveScript() {
-        return this.savePage();
-    },
-
-    async persistDatabase(message) {
-        // Always read the latest database SHA immediately before updating it.
-        // This prevents publishing failures caused by a stale browser-side SHA.
-        this.dbSha = await this.getRemoteDatabaseSha();
-        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`;
-        const dbRes = await fetch(url, {
-            method: 'PUT',
-            headers: this.githubHeaders(),
-            body: JSON.stringify({
-                message,
-                content: utils.safeBtoa(JSON.stringify(this.db, null, 2)),
-                sha: this.dbSha,
-                branch: CONFIG.branch
-            })
-        });
-        if (!dbRes.ok) {
-            let body = {};
-            try { body = await dbRes.json(); } catch (_) {}
-            throw new Error(this.explainGithubError(dbRes.status, body));
-        }
-        const newDbData = await dbRes.json();
-        this.dbSha = newDbData?.content?.sha || this.dbSha;
-    },
-
     async savePage() {
         if (!this.currentUser || !this.db) {
-            this.showToast('Please sign in first.', 'error');
+            this.showToast('Please log in first.', 'error');
             return;
         }
         if (this.actionInProgress) return;
-        const title = document.getElementById('edit-title')?.value.trim() || '';
-        const visibility = document.getElementById('edit-visibility')?.value || 'PUBLIC';
-        const desc = document.getElementById('edit-desc')?.value.trim() || '';
-        const saveBtn = document.getElementById('page-save-btn');
-        const collected = this.collectEditorScripts();
-        const isEditing = !!this.currentEditingPageTitle;
-        const oldPage = isEditing ? this.db.pages[this.currentEditingPageTitle] : null;
-        const oldPageId = this.originalPageId || oldPage?.id || null;
-        const pageId = utils.sanitizeTitle(title);
+
+        this.actionInProgress = true;
+        const titleInput = document.getElementById('edit-page-title');
+        const visibilityInput = document.getElementById('edit-visibility');
+        const descInput = document.getElementById('edit-desc');
+        const saveBtn = document.querySelector('.editor-footer .btn-primary');
+
+        const title = titleInput?.value.trim() || '';
+        const visibility = visibilityInput?.value || 'PUBLIC';
+        const description = descInput?.value.trim() || '';
+        const scriptEntries = this.collectPageScripts();
+        const originalBtnText = saveBtn?.textContent || 'Publish Page';
+
         const titleError = utils.validateTitle(title);
-        try {
-            if (titleError) throw new Error(titleError);
-            if (!pageId) throw new Error('The page title does not produce a valid URL.');
-            if (!collected.length) throw new Error('Add at least one script to the page.');
-            const duplicateIds = new Set();
-            const prepared = this.makeUniqueScriptIds(collected, oldPage);
-            for (const script of prepared) {
-                if (!script.name) throw new Error('Every Script Name is required.');
-                if (duplicateIds.has(script.id)) throw new Error(`The script file name for “${script.name}” conflicts with another script. Rename it.`);
-                duplicateIds.add(script.id);
-                const codeError = utils.validateCode(script.code);
-                if (codeError) throw new Error(`Script “${script.name}”: ${codeError}`);
+        if (titleError) {
+            this.showToast(titleError, 'error');
+            this.actionInProgress = false;
+            return;
+        }
+        if (!scriptEntries.length) {
+            this.showToast('Add at least one script to the page.', 'error');
+            this.actionInProgress = false;
+            return;
+        }
+
+        const usedIds = new Set();
+        for (const entry of scriptEntries) {
+            if (!entry.name) {
+                this.showToast('Every script needs a Script Name.', 'error');
+                this.actionInProgress = false;
+                return;
             }
-            const pageExists = Object.entries(this.db.pages).some(([existingTitle, page]) => {
-                if (isEditing && existingTitle === this.currentEditingPageTitle) return false;
-                return (page.id || utils.sanitizeTitle(existingTitle)) === pageId;
-            });
-            if (pageExists) throw new Error('This Page ID is already in use. Choose a different title.');
+            if (entry.name.length > 100) {
+                this.showToast('Script names must be less than 100 characters.', 'error');
+                this.actionInProgress = false;
+                return;
+            }
+            const codeError = utils.validateCode(entry.code);
+            if (codeError) {
+                this.showToast(`${entry.name}: ${codeError}`, 'error');
+                this.actionInProgress = false;
+                return;
+            }
+            const scriptId = utils.sanitizeTitle(entry.name);
+            if (!scriptId) {
+                this.showToast(`"${entry.name}" cannot be used as a file name.`, 'error');
+                this.actionInProgress = false;
+                return;
+            }
+            if (usedIds.has(scriptId)) {
+                this.showToast(`Script names must be unique on this page: "${entry.name}".`, 'error');
+                this.actionInProgress = false;
+                return;
+            }
+            usedIds.add(scriptId);
+        }
 
-            this.actionInProgress = true;
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Updating...' : 'Publishing...'; }
-            if (typeof NProgress !== 'undefined') NProgress.start();
+        const isEditing = !!this.currentEditingId;
+        const pageId = utils.sanitizeTitle(title);
+        const oldPage = isEditing ? this.db.pages[this.currentEditingId] : null;
+        if (!pageId) {
+            this.showToast('Page Title cannot be converted into a valid URL.', 'error');
+            this.actionInProgress = false;
+            return;
+        }
+        if (!isEditing && this.db.pages[pageId]) {
+            this.showToast('A page with that title already exists.', 'error');
+            this.actionInProgress = false;
+            return;
+        }
+        if (isEditing && pageId !== this.currentEditingId && this.db.pages[pageId]) {
+            this.showToast('Another page already uses that title.', 'error');
+            this.actionInProgress = false;
+            return;
+        }
 
-            // Validate repository access before writing any generated files.
-            await this.getRemoteDatabaseSha();
-            const now = new Date().toISOString();
-            const pageData = {
-                id: pageId,
-                title,
-                displayTitle: title,
-                visibility,
-                description: desc,
-                scripts: prepared.map(script => ({
-                    id: script.id,
-                    name: script.name,
-                    filename: `${script.id}.lua`,
-                    size: script.code.length,
-                    created: oldPage?.scripts?.find(item => item.id === script.oldId || item.name === script.name)?.created || now,
-                    updated: now
-                })),
-                created: oldPage?.created || now,
-                updated: now
+        const created = oldPage?.created || new Date().toISOString();
+        const now = new Date().toISOString();
+        const scripts = {};
+        scriptEntries.forEach(entry => {
+            const scriptId = utils.sanitizeTitle(entry.name);
+            const oldScript = oldPage?.scripts?.[entry.entryId] || oldPage?.scripts?.[scriptId];
+            scripts[scriptId] = {
+                id: scriptId,
+                name: entry.name,
+                displayName: entry.name,
+                filename: `${scriptId}.lua`,
+                size: entry.code.length,
+                created: oldScript?.created || now,
+                updated: now,
+                previousId: oldScript && oldScript.id !== scriptId ? oldScript.id : undefined
             };
+        });
 
-            await this.createPageFiles(pageData, prepared, isEditing ? { ...oldPage, id: oldPageId } : null);
-            const nextDb = JSON.parse(JSON.stringify(this.db));
-            if (isEditing && this.currentEditingPageTitle !== title) delete nextDb.pages[this.currentEditingPageTitle];
-            nextDb.pages[title] = pageData;
+        const pageData = {
+            id: pageId,
+            title,
+            displayTitle: title,
+            visibility,
+            description,
+            created,
+            updated: now,
+            scripts
+        };
+        pageData.filename = 'index.html';
+
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.textContent = isEditing ? 'Updating Page...' : 'Publishing Page...';
+        }
+        if (typeof NProgress !== 'undefined') NProgress.start();
+
+        try {
+            await this.createPageFiles(pageId, pageData, scriptEntries);
+
+            this.dbSha = await this.ensureDatabaseSha();
+            const nextDb = this.normalizeDatabase(JSON.parse(JSON.stringify(this.db)));
+            if (isEditing) delete nextDb.pages[this.currentEditingId];
+            nextDb.pages[pageId] = pageData;
+            nextDb.bots = nextDb.bots || {};
+
+            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${this.token}`,
+                    'Accept': 'application/vnd.github+json',
+                    'X-GitHub-Api-Version': '2026-03-10',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: `${isEditing ? 'Update' : 'Add'} page ${title}`,
+                    content: utils.safeBtoa(JSON.stringify(nextDb, null, 2)),
+                    sha: this.dbSha,
+                    branch: CONFIG.branch
+                })
+            });
+
+            if (!dbRes.ok) {
+                let detail = `HTTP ${dbRes.status}`;
+                try {
+                    const body = await dbRes.json();
+                    if (body?.message) detail += `: ${body.message}`;
+                } catch (_) {}
+                throw new Error(`Failed to update database — ${detail}`);
+            }
+
+            const newDbData = await dbRes.json();
             this.db = nextDb;
-            this.normalizeDatabase();
-            await this.persistDatabase(`${isEditing ? 'Update' : 'Publish'} page: ${title}`);
-            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
+            this.dbSha = newDbData.content.sha;
 
-            this.currentEditingPageTitle = title;
+            try {
+                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
+            } catch (storageError) {
+                console.warn('Could not persist local database cache:', storageError);
+            }
+
+            // Clean up files that are no longer referenced.
+            if (isEditing && this.currentEditingId === pageId && oldPage) {
+                await this.deleteObsoleteScriptFiles(pageId, oldPage, pageData);
+            } else if (isEditing && this.currentEditingId !== pageId && oldPage) {
+                try { await this.deletePageFiles(this.currentEditingId, oldPage); } catch (cleanupError) {
+                    console.warn('Old page cleanup failed:', cleanupError);
+                }
+            }
+
+            this.currentEditingId = pageId;
             this.originalTitle = title;
             this.originalPageId = pageId;
-            this.showToast(isEditing ? 'Page updated successfully.' : 'Page published successfully.', 'success');
+
+            document.getElementById('editor-heading').textContent = `Edit: ${title}`;
+            if (saveBtn) saveBtn.textContent = 'Update Page';
+
+            this.showToast(`${isEditing ? 'Page updated' : 'Page published'} successfully.`, 'success');
             this.renderList();
             this.renderAdminList();
-            document.getElementById('page-editor-status') && (document.getElementById('page-editor-status').textContent = 'Saved');
-            document.getElementById('editor-heading') && (document.getElementById('editor-heading').textContent = `Edit: ${title}`);
-            if (saveBtn) saveBtn.textContent = 'Update Page';
-        } catch (error) {
-            console.error('Page save error:', error);
-            this.showToast(`Failed to publish the page: ${error.message}`, 'error');
+            this.renderAdminStats();
+        } catch (e) {
+            console.error('Save page error:', e);
+            this.showToast(`Error: ${e.message}`, 'error');
         } finally {
-            if (saveBtn) saveBtn.disabled = false;
+            if (saveBtn) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = isEditing ? 'Update Page' : originalBtnText;
+            }
             this.actionInProgress = false;
             if (typeof NProgress !== 'undefined') NProgress.done();
         }
     },
 
-    async createPageFiles(page, scripts, oldPage = null) {
-        const oldScripts = oldPage?.scripts || [];
-        const oldPageId = oldPage?.id || null;
-        const currentFiles = new Set((page.scripts || []).map(script => script.filename));
-        if (oldPageId && oldPageId === page.id) {
-            for (const oldScript of oldScripts) {
-                if (!currentFiles.has(oldScript.filename)) await this.deleteRemoteFile(`pages/${page.id}/raw/${oldScript.filename}`);
-            }
-        }
-        for (const script of scripts) {
-            await this.createOrUpdateFile(`pages/${page.id}/raw/${script.id}.lua`, script.code, 'text/plain');
-        }
-        await this.createOrUpdateFile(`pages/${page.id}/index.html`, this.generatePageViewerHTML(page), 'text/html');
-        if (oldPageId && oldPageId !== page.id) await this.deletePageFiles(oldPageId, oldScripts);
+    // Backward-compatible alias for integrations using the old method name.
+    async saveScript() {
+        return this.savePage();
     },
 
-    async deleteRemoteFile(path) {
-        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-        const res = await fetch(url, { headers: this.githubHeaders(), cache: 'no-store' });
-        if (res.status === 404) return;
-        if (!res.ok) { let body = {}; try { body = await res.json(); } catch (_) {} throw new Error(`${this.explainGithubError(res.status, body)} File: ${path}`); }
-        const file = await res.json();
-        const del = await fetch(url, { method: 'DELETE', headers: this.githubHeaders(), body: JSON.stringify({ message: `Delete file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
-        if (!del.ok) { let body = {}; try { body = await del.json(); } catch (_) {} throw new Error(`${this.explainGithubError(del.status, body)} File: ${path}`); }
-    },
+    async createPageFiles(pageId, pageData, scriptEntries) {
+        const scriptDir = `scripts/${pageId}`;
+        const indexPath = `${scriptDir}/index.html`;
+        const scriptManifest = Object.values(pageData.scripts || {}).map(script => ({
+            id: script.id,
+            name: script.name,
+            filename: script.filename
+        }));
+        const manifestJson = JSON.stringify(scriptManifest).replace(/</g, '\\u003c');
+        const pageTitleJson = JSON.stringify(pageData.title).replace(/</g, '\\u003c');
+        const descriptionJson = JSON.stringify(pageData.description || '').replace(/</g, '\\u003c');
 
-    safeJsonForScript(value) {
-        return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
-    },
-
-    generatePageViewerHTML(page) {
-        const escapedTitle = utils.escapeHtml(page.title);
-        const manifest = this.safeJsonForScript((page.scripts || []).map(script => ({ id: script.id, name: script.name, filename: script.filename })));
-        const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
-        const created = new Date(page.created || Date.now()).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
-
-        return `<!DOCTYPE html>
+        const scriptViewerHTML = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapedTitle} - CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/png" href="${CONFIG.pageUrl('assets/favicon.ico')}">
-    <link rel="stylesheet" href="${CONFIG.pageUrl('style.css?v=20260925-page-builder-v2')}">
+    <title>${utils.escapeHtml(pageData.title)} - CihuyAkz Studio Lite</title>
+    <link rel="icon" type="image/png" href="../../assets/favicon.ico">
+    <link rel="stylesheet" href="../../style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { background: #100306; }
+        .page-shell { max-width: 1440px; margin: 96px auto 48px; padding: 0 28px; }
+        .page-hero { padding: 30px 0 22px; }
+        .page-hero .eyebrow { color:#ff8f8f; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.16em; }
+        .page-hero h1 { margin:8px 0 8px; font-size: clamp(28px,4vw,44px); letter-spacing:-1.5px; }
+        .page-hero p { max-width: 760px; color:#d4aeb2; font-size:14px; }
+        .page-layout { display:grid; grid-template-columns:280px minmax(0,1fr); gap:18px; align-items:start; }
+        .script-nav { position:sticky; top:88px; padding:12px; border:1px solid rgba(255,84,84,.18); border-radius:18px; background:rgba(25,5,10,.88); box-shadow:0 18px 45px rgba(72,0,14,.22); }
+        .script-nav-title { padding:10px 10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#c99ca3; font-weight:800; }
+        .script-nav button { display:flex; align-items:center; width:100%; gap:10px; border:1px solid transparent; background:transparent; color:#e6cfd1; padding:12px 11px; border-radius:12px; text-align:left; cursor:pointer; font-weight:600; }
+        .script-nav button:hover { background:rgba(255,59,59,.08); color:#fff; }
+        .script-nav button.active { border-color:rgba(255,84,84,.25); background:linear-gradient(90deg,rgba(255,59,59,.16),rgba(155,18,55,.08)); color:#fff; }
+        .script-nav .nav-index { width:24px; height:24px; border-radius:7px; display:grid; place-items:center; background:rgba(255,255,255,.06); color:#ff8f8f; font-size:11px; flex:0 0 24px; }
+        .viewer-card { min-width:0; border:1px solid rgba(255,84,84,.18); border-radius:18px; overflow:hidden; background:rgba(17,4,8,.88); box-shadow:0 18px 45px rgba(72,0,14,.22); }
+        .viewer-header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding:16px 18px; border-bottom:1px solid rgba(255,84,84,.16); background:linear-gradient(90deg,rgba(62,7,15,.92),rgba(22,4,8,.96)); }
+        .viewer-file { min-width:0; }
+        .viewer-file strong { display:block; font-size:15px; color:#fff; }
+        .viewer-file span { display:block; margin-top:3px; color:#b78c92; font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .viewer-actions { display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
+        .viewer-code { margin:0; min-height:60vh; max-height:75vh; overflow:auto; padding:20px; background:#120307; }
+        .viewer-code code { font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace; }
+        .viewer-empty { padding:60px 24px; text-align:center; color:#b78c92; }
+        @media (max-width: 850px) {
+            .page-layout { grid-template-columns:1fr; }
+            .script-nav { position:static; display:flex; gap:6px; overflow:auto; }
+            .script-nav-title { display:none; }
+            .script-nav button { min-width:170px; }
+            .viewer-header { align-items:flex-start; flex-direction:column; }
+            .viewer-actions { justify-content:flex-start; }
+        }
+    </style>
 </head>
-<body class="script-page-body">
+<body>
     <nav class="navbar">
         <div class="nav-content">
             <div class="nav-left">
-                <a href="${CONFIG.pageUrl('')}" class="brand" style="text-decoration:none;color:inherit;">
-                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
+                <a href="../../index.html" class="brand" style="text-decoration:none;color:inherit;">
+                    <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="CihuyAkz Studio Lite">
                     <span class="nav-title">CihuyAkz Studio Lite</span>
                 </a>
             </div>
             <div class="nav-right">
-                <a href="${CONFIG.pageUrl('')}" class="btn btn-secondary btn-sm">Back</a>
+                <a href="../../index.html" class="btn btn-secondary btn-sm">Back to Library</a>
             </div>
         </div>
     </nav>
 
-    <main class="container script-page-container">
-        <section id="script-content" class="script-page-content">
-            <div class="script-header-lg page-hero-header">
-                <div>
-                    <h1>${escapedTitle}</h1>
-                    <div class="meta-row">
-                        <span class="meta-badge">${(page.scripts || []).length} scripts</span>
-                        <span class="meta-badge">Updated ${created}</span>
+    <main class="page-shell">
+        <header class="page-hero">
+            <span class="eyebrow">Script Page</span>
+            <h1 id="page-title"></h1>
+            <p id="page-description"></p>
+        </header>
+
+        <div class="page-layout">
+            <aside class="script-nav">
+                <div class="script-nav-title">Scripts on this page</div>
+                <div id="script-nav-items"></div>
+            </aside>
+
+            <section class="viewer-card">
+                <div class="viewer-header">
+                    <div class="viewer-file">
+                        <strong id="active-script-name">Loading...</strong>
+                        <span id="active-script-file"></span>
+                    </div>
+                    <div class="viewer-actions">
+                        <button class="btn btn-sm" id="copy-button" type="button">Copy</button>
+                        <button class="btn btn-sm" id="download-button" type="button">Download</button>
+                        <a class="btn btn-secondary btn-sm" id="raw-button" target="_blank" rel="noopener">Raw</a>
                     </div>
                 </div>
-            </div>
-            ${description}
-            <div id="page-script-tabs" class="page-script-tabs"></div>
-            <div id="page-script-panels" class="page-script-panels"></div>
-        </section>
+                <pre class="viewer-code"><code id="code-display" class="language-lua">Loading...</code></pre>
+            </section>
+        </div>
     </main>
 
+    <script>
+        const pageTitle = ${pageTitleJson};
+        const pageDescription = ${descriptionJson};
+        const scripts = ${manifestJson};
+
+        let activeScript = scripts[0] || null;
+
+        document.getElementById('page-title').textContent = pageTitle;
+        document.getElementById('page-description').textContent = pageDescription;
+
+        function renderScriptNav() {
+            const nav = document.getElementById('script-nav-items');
+            nav.innerHTML = scripts.map((script, index) => \`
+                <button type="button" class="\${activeScript && activeScript.id === script.id ? 'active' : ''}" data-script-id="\${script.id}">
+                    <span class="nav-index">\${String(index + 1).padStart(2,'0')}</span>
+                    <span>\${script.name}</span>
+                </button>
+            \`).join('');
+            nav.querySelectorAll('button').forEach(button => {
+                button.addEventListener('click', () => {
+                    const script = scripts.find(item => item.id === button.dataset.scriptId);
+                    if (script) selectScript(script);
+                });
+            });
+        }
+
+        async function selectScript(script) {
+            activeScript = script;
+            renderScriptNav();
+            const name = document.getElementById('active-script-name');
+            const file = document.getElementById('active-script-file');
+            const code = document.getElementById('code-display');
+            const rawButton = document.getElementById('raw-button');
+            name.textContent = script.name;
+            file.textContent = 'raw/' + script.filename;
+            rawButton.href = 'raw/' + encodeURIComponent(script.filename);
+            code.textContent = 'Loading...';
+
+            try {
+                const res = await fetch('raw/' + encodeURIComponent(script.filename), { cache: 'no-store' });
+                if (!res.ok) throw new Error('Failed to load script');
+                code.textContent = await res.text();
+                if (window.Prism) Prism.highlightElement(code);
+            } catch (error) {
+                code.textContent = '-- Unable to load this script source.';
+            }
+        }
+
+        document.getElementById('copy-button').addEventListener('click', async () => {
+            const code = document.getElementById('code-display').textContent;
+            try {
+                await navigator.clipboard.writeText(code);
+                const button = document.getElementById('copy-button');
+                const original = button.textContent;
+                button.textContent = 'Copied';
+                setTimeout(() => button.textContent = original, 1500);
+            } catch (_) {}
+        });
+
+        document.getElementById('download-button').addEventListener('click', () => {
+            if (!activeScript) return;
+            const code = document.getElementById('code-display').textContent;
+            const element = document.createElement('a');
+            element.href = 'data:text/plain;charset=utf-8,' + encodeURIComponent(code);
+            element.download = activeScript.filename;
+            document.body.appendChild(element);
+            element.click();
+            element.remove();
+        });
+
+        renderScriptNav();
+        if (activeScript) selectScript(activeScript);
+        else document.getElementById('code-display').textContent = '-- No scripts published on this page.';
+    </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
-    <script>
-        const SCRIPTS = ${manifest};
-
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
-        }
-
-        const sourceCache = {};
-        const tabs = document.getElementById('page-script-tabs');
-        const panels = document.getElementById('page-script-panels');
-
-        function renderScripts() {
-            tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
-            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Copy</button><button class="btn btn-sm" type="button" data-download="' + index + '">Download</button><a href="' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Loading...</code></pre></div></section>').join('');
-
-            tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
-                const index = Number(tab.dataset.index);
-                tabs.querySelectorAll('.page-script-tab').forEach(item => item.classList.toggle('active', Number(item.dataset.index) === index));
-                panels.querySelectorAll('.page-script-panel').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.panel) === index));
-            }));
-            tabs.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', () => copyScript(Number(btn.dataset.copy), btn)));
-            tabs.querySelectorAll('[data-download]').forEach(btn => btn.addEventListener('click', () => downloadScript(Number(btn.dataset.download))));
-            loadScriptSources();
-        }
-
-        async function loadScriptSources() {
-            await Promise.all(SCRIPTS.map(async (script, index) => {
-                try {
-                    const response = await fetch('raw/' + encodeURIComponent(script.filename), { cache: 'no-store' });
-                    if (!response.ok) throw new Error('HTTP ' + response.status);
-                    const code = await response.text();
-                    sourceCache[index] = code;
-                    const block = document.getElementById('code-' + index);
-                    if (block) {
-                        block.textContent = code;
-                        Prism.highlightElement(block);
-                    }
-                } catch (_) {
-                    const block = document.getElementById('code-' + index);
-                    if (block) block.textContent = '-- Failed to load Lua source';
-                }
-            }));
-        }
-
-        async function copyScript(index, btn) {
-            try {
-                const code = sourceCache[index] || '';
-                await navigator.clipboard.writeText(code);
-                const original = btn.textContent;
-                btn.textContent = 'Copied';
-                setTimeout(() => btn.textContent = original, 1600);
-            } catch (_) {}
-        }
-
-        function downloadScript(index) {
-            const script = SCRIPTS[index];
-            const code = sourceCache[index] || '';
-            const blobUrl = URL.createObjectURL(new Blob([code], { type: 'text/plain;charset=utf-8' }));
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = script.filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        }
-
-        renderScripts();
-    </script>
 </body>
 </html>`;
+
+        await this.createOrUpdateFile(indexPath, scriptViewerHTML, 'text/html');
+
+        for (const entry of scriptEntries) {
+            const scriptId = utils.sanitizeTitle(entry.name);
+            const rawPath = `${scriptDir}/raw/${scriptId}.lua`;
+            await this.createOrUpdateFile(rawPath, entry.code, 'text/plain');
+        }
     },
 
     async createOrUpdateFile(path, content, contentType) {
         const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
-        const getRes = await fetch(url, { headers: this.githubHeaders(), cache: 'no-store' });
+        const getRes = await fetch(url, { headers: { 'Authorization': `token ${this.token}` } });
+        
         let sha = null;
         if (getRes.ok) {
-            sha = (await getRes.json()).sha || null;
-        } else if (getRes.status !== 404) {
-            let body = {}; try { body = await getRes.json(); } catch (_) {}
-            throw new Error(`${this.explainGithubError(getRes.status, body)} File: ${path}`);
+            const existingFile = await getRes.json();
+            sha = existingFile.sha;
         }
+        
         const body = {
-            message: `Publish ${path}`,
+            message: `Create/update ${path}`,
             content: utils.safeBtoa(content),
-            branch: CONFIG.branch,
-            ...(sha ? { sha } : {})
+            branch: CONFIG.branch
         };
-        const putRes = await fetch(url, { method: 'PUT', headers: this.githubHeaders(), body: JSON.stringify(body) });
+        if (sha) body.sha = sha;
+        
+        const putRes = await fetch(url, {
+            method: 'PUT',
+            headers: { 
+                'Authorization': `token ${this.token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+        
         if (!putRes.ok) {
-            let errorBody = {}; try { errorBody = await putRes.json(); } catch (_) {}
-            throw new Error(`${this.explainGithubError(putRes.status, errorBody)} File: ${path}`);
+            let detail = `HTTP ${putRes.status}`;
+            try {
+                const errorBody = await putRes.json();
+                if (errorBody?.message) detail += `: ${errorBody.message}`;
+                if (errorBody?.documentation_url) detail += ` (${errorBody.documentation_url})`;
+            } catch (_) {}
+            throw new Error(`Failed to create/update file ${path} — ${detail}`);
         }
-        return await putRes.json();
     },
 
     handleRouting() {
