@@ -5,17 +5,10 @@ const CONFIG = {
     allowedUser: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
-    // Builds the public GitHub Pages base URL from repoOwner/repo so raw
-    // script fetches keep working no matter which account this is forked to.
-    // User page (repo named "<owner>.github.io") -> https://owner.github.io/
-    // Project page (any other repo name)          -> https://owner.github.io/repo/
+
+    // GitHub Pages URL for this project fork.
     pagesBaseUrl() {
-        const ownerLower = this.repoOwner.toLowerCase();
-        const repoLower = this.repo.toLowerCase();
-        if (repoLower === `${ownerLower}.github.io`) {
-            return `https://${ownerLower}.github.io/`;
-        }
-        return `https://${ownerLower}.github.io/${this.repo}/`;
+        return `https://${this.repoOwner.toLowerCase()}.github.io/${this.repo}/`;
     }
 };
 
@@ -75,18 +68,6 @@ const utils = {
         if (code.length > 100000) return 'Code is too large (max 100KB)';
         return null;
     },
-
-    validateThumbnail(thumbnail) {
-        if (!thumbnail) return null;
-        if (thumbnail.length > 1200) return 'Thumbnail URL is too long';
-        if (/^data:/i.test(thumbnail) || /^javascript:/i.test(thumbnail)) {
-            return 'Thumbnail must use a normal image URL or a relative image path';
-        }
-        if (/^https?:\/\//i.test(thumbnail) || /^(?:\.\.?\/|\/|assets\/|scripts\/)/i.test(thumbnail)) {
-            return null;
-        }
-        return 'Thumbnail must use https://, http://, or a relative image path';
-    },
     
     formatDisplayTime(isoString, timezone) {
         const date = new Date(isoString);
@@ -118,7 +99,6 @@ const app = {
     isLoading: false,
     searchQuery: '',
     scheduledTimers: {},
-    thumbnailPreviewHoverActive: false,
     
     async init() {
         const sessionValid = await this.loadSession();
@@ -341,7 +321,7 @@ const app = {
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
-                throw new Error(`Only the GitHub account ${CONFIG.allowedUser} can manage this site. This token belongs to ${user.login}.`);
+                throw new Error(`Akses hanya untuk akun GitHub ${CONFIG.allowedUser}. Token ini milik ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -359,17 +339,6 @@ const app = {
         }
     },
 
-    normalizeDatabase() {
-        if (!this.db || typeof this.db !== 'object') this.db = {};
-        if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
-        if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
-
-        const example = this.db.scripts['Example Script'];
-        if (example && typeof example.thumbnail === 'undefined') {
-            example.thumbnail = 'assets/example-thumbnail.jpg';
-        }
-    },
-
     async loadDatabase() {
         try {
             this.isLoading = true;
@@ -384,7 +353,8 @@ const app = {
             const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
-                this.normalizeDatabase();
+                if (!this.db.scripts) this.db.scripts = {};
+                if (!this.db.bots) this.db.bots = {};
                 this.renderList();
                 this.renderAdminList();
                 return;
@@ -397,7 +367,8 @@ const app = {
             if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
 
             this.db = await localRes.json();
-            this.normalizeDatabase();
+            if (!this.db.scripts) this.db.scripts = {};
+            if (!this.db.bots) this.db.bots = {};
             try {
                 localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
@@ -682,24 +653,13 @@ const app = {
         
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
-            const safeTitle = utils.escapeHtml(s.title);
-            const thumbnailEnabled = s.thumbnailEnabled !== false;
-            const thumbnail = thumbnailEnabled && typeof s.thumbnail === 'string' ? s.thumbnail.trim() : '';
-            const safeThumbnail = thumbnail ? utils.escapeHtml(thumbnail) : '';
-            const thumbScale = Math.min(Math.max(typeof s.thumbnailScale === 'number' ? s.thumbnailScale : 1, 1), 3);
-            const thumbPosX = Math.min(Math.max(typeof s.thumbnailPosX === 'number' ? s.thumbnailPosX : 50, 0), 100);
-            const thumbPosY = Math.min(Math.max(typeof s.thumbnailPosY === 'number' ? s.thumbnailPosY : 50, 0), 100);
-            return `<div class="script-card${thumbnail ? ' has-thumbnail' : ''}" tabindex="0" role="link" aria-label="Open ${safeTitle}" onclick="window.location.href='scripts/${scriptId}/index.html'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                ${thumbnail ? `<div class="script-card-media" aria-hidden="true">
-                    <div class="script-card-media-gradient"></div>
-                    <img src="${safeThumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer" style="--thumb-scale:${thumbScale};--thumb-pos-x:${thumbPosX}%;--thumb-pos-y:${thumbPosY}%;" onerror="this.closest('.script-card').classList.add('thumbnail-error')">
-                </div>` : ''}
+            return `<div class="script-card" onclick="window.location.href='scripts/${scriptId}/index.html'">
                 <div class="card-content">
                     <div class="card-header-section">
-                        <h3 class="script-title">${safeTitle}</h3>
+                        <h3 class="script-title">${utils.escapeHtml(s.title)}</h3>
                         ${s.visibility !== 'PUBLIC' ? `<span class="badge badge-${s.visibility.toLowerCase()}">${s.visibility}</span>` : ''}
                     </div>
-                    ${s.description ? `<p class="script-card-description">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
+                    ${s.description ? `<p style="color:var(--color-text-muted);font-size:13px;margin:8px 0">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
@@ -800,7 +760,6 @@ const app = {
                     <div class="admin-meta">
                         <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
                         <span class="text-muted">Updated ${updated}</span>
-                        ${s.thumbnail ? (s.thumbnailEnabled !== false ? '<span class="thumbnail-admin-status">Thumbnail</span>' : '<span class="thumbnail-admin-status thumbnail-admin-status-off">Thumbnail Off</span>') : ''}
                     </div>
                 </div>
                 <div class="admin-item-right">
@@ -1081,12 +1040,6 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = '';
-        const editThumbnail = document.getElementById('edit-thumbnail');
-        if (editThumbnail) editThumbnail.value = '';
-        const editThumbnailEnabled = document.getElementById('edit-thumbnail-enabled');
-        if (editThumbnailEnabled) editThumbnailEnabled.checked = true;
-        this.resetThumbnailPreviewHoverToggle();
-        this.resetThumbnailAdjust();
         
         if (window.cmEditor) window.cmEditor.setValue('');
         
@@ -1129,112 +1082,6 @@ const app = {
         }
     },
 
-    updateThumbnailPreview() {
-        const input = document.getElementById('edit-thumbnail');
-        const preview = document.getElementById('thumbnail-preview');
-        const enabledCheckbox = document.getElementById('edit-thumbnail-enabled');
-        if (!input || !preview) return;
-
-        this.syncThumbnailAdjustLabels();
-        preview.classList.toggle('show-hover-gradient', this.thumbnailPreviewHoverActive);
-
-        const value = input.value.trim();
-        const enabled = enabledCheckbox ? enabledCheckbox.checked : true;
-
-        if (!value) {
-            preview.classList.remove('has-image', 'preview-error');
-            preview.innerHTML = '<span>No thumbnail</span>';
-            return;
-        }
-
-        if (!enabled) {
-            preview.classList.remove('has-image', 'preview-error');
-            preview.innerHTML = '<span>Thumbnail disabled</span>';
-            return;
-        }
-
-        const safeValue = utils.escapeHtml(value);
-        const { scale, posX, posY } = this.getThumbnailAdjustValues();
-        preview.classList.remove('preview-error');
-        preview.classList.add('has-image');
-        preview.innerHTML = `<div class="thumbnail-preview-glow"></div><div class="thumbnail-preview-gradient"></div><img src="${safeValue}" alt="Thumbnail preview" style="--thumb-scale:${scale};--thumb-pos-x:${posX}%;--thumb-pos-y:${posY}%;" onerror="this.closest('.thumbnail-preview').classList.add('preview-error')">`;
-    },
-
-    toggleThumbnailPreviewHover() {
-        this.thumbnailPreviewHoverActive = !this.thumbnailPreviewHoverActive;
-        const btn = document.getElementById('thumbnail-preview-hover-btn');
-        if (btn) {
-            btn.classList.toggle('active', this.thumbnailPreviewHoverActive);
-            btn.setAttribute('aria-pressed', this.thumbnailPreviewHoverActive ? 'true' : 'false');
-            const label = this.thumbnailPreviewHoverActive ? 'Hide Hover' : 'Preview Hover';
-            const icon = btn.querySelector('svg');
-            btn.innerHTML = '';
-            if (icon) btn.appendChild(icon);
-            btn.appendChild(document.createTextNode(' ' + label));
-        }
-        this.updateThumbnailPreview();
-    },
-
-    resetThumbnailPreviewHoverToggle() {
-        this.thumbnailPreviewHoverActive = false;
-        const btn = document.getElementById('thumbnail-preview-hover-btn');
-        if (btn) {
-            btn.classList.remove('active');
-            btn.setAttribute('aria-pressed', 'false');
-            const icon = btn.querySelector('svg');
-            btn.innerHTML = '';
-            if (icon) btn.appendChild(icon);
-            btn.appendChild(document.createTextNode(' Preview Hover'));
-        }
-    },
-
-    getThumbnailAdjustValues() {
-        const scaleInput = document.getElementById('edit-thumbnail-scale');
-        const posXInput = document.getElementById('edit-thumbnail-pos-x');
-        const posYInput = document.getElementById('edit-thumbnail-pos-y');
-
-        let scale = scaleInput ? parseFloat(scaleInput.value) / 100 : 1;
-        let posX = posXInput ? parseFloat(posXInput.value) : 50;
-        let posY = posYInput ? parseFloat(posYInput.value) : 50;
-
-        if (isNaN(scale)) scale = 1;
-        if (isNaN(posX)) posX = 50;
-        if (isNaN(posY)) posY = 50;
-
-        // Scale can only ever zoom in from the fully-covered state (1 = fills
-        // the card exactly), so the image can never leave a black bar behind.
-        scale = Math.min(Math.max(scale, 1), 3);
-        posX = Math.min(Math.max(posX, 0), 100);
-        posY = Math.min(Math.max(posY, 0), 100);
-
-        return { scale, posX, posY };
-    },
-
-    syncThumbnailAdjustLabels() {
-        const scaleInput = document.getElementById('edit-thumbnail-scale');
-        const posXInput = document.getElementById('edit-thumbnail-pos-x');
-        const posYInput = document.getElementById('edit-thumbnail-pos-y');
-        const scaleLabel = document.getElementById('edit-thumbnail-scale-value');
-        const posXLabel = document.getElementById('edit-thumbnail-pos-x-value');
-        const posYLabel = document.getElementById('edit-thumbnail-pos-y-value');
-
-        if (scaleInput && scaleLabel) scaleLabel.textContent = `${scaleInput.value}%`;
-        if (posXInput && posXLabel) posXLabel.textContent = `${posXInput.value}%`;
-        if (posYInput && posYLabel) posYLabel.textContent = `${posYInput.value}%`;
-    },
-
-    resetThumbnailAdjust() {
-        const scaleInput = document.getElementById('edit-thumbnail-scale');
-        const posXInput = document.getElementById('edit-thumbnail-pos-x');
-        const posYInput = document.getElementById('edit-thumbnail-pos-y');
-
-        if (scaleInput) scaleInput.value = 100;
-        if (posXInput) posXInput.value = 50;
-        if (posYInput) posYInput.value = 50;
-
-        this.updateThumbnailPreview();
-    },
-
     async populateEditor(title) {
         if (!this.currentUser || !this.db || !this.db.scripts[title]) return;
         const s = this.db.scripts[title];
@@ -1251,18 +1098,6 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = s.description || '';
-        const editThumbnail = document.getElementById('edit-thumbnail');
-        if (editThumbnail) editThumbnail.value = s.thumbnail || '';
-        const editThumbnailEnabled = document.getElementById('edit-thumbnail-enabled');
-        if (editThumbnailEnabled) editThumbnailEnabled.checked = s.thumbnailEnabled !== false;
-        const scaleInput = document.getElementById('edit-thumbnail-scale');
-        if (scaleInput) scaleInput.value = Math.round((typeof s.thumbnailScale === 'number' ? s.thumbnailScale : 1) * 100);
-        const posXInput = document.getElementById('edit-thumbnail-pos-x');
-        if (posXInput) posXInput.value = typeof s.thumbnailPosX === 'number' ? s.thumbnailPosX : 50;
-        const posYInput = document.getElementById('edit-thumbnail-pos-y');
-        if (posYInput) posYInput.value = typeof s.thumbnailPosY === 'number' ? s.thumbnailPosY : 50;
-        this.resetThumbnailPreviewHoverToggle();
-        this.updateThumbnailPreview();
         
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
@@ -1348,8 +1183,6 @@ const app = {
         const titleInput = document.getElementById('edit-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
-        const thumbnailInput = document.getElementById('edit-thumbnail');
-        const thumbnailEnabledInput = document.getElementById('edit-thumbnail-enabled');
         const saveBtn = document.querySelector('.editor-actions .btn:last-child');
         
         if (!titleInput || !visibilityInput || !saveBtn) {
@@ -1362,17 +1195,13 @@ const app = {
         const visibility = visibilityInput.value;
         const code = window.cmEditor ? window.cmEditor.getValue() : '';
         const desc = descInput ? descInput.value.trim() : '';
-        const thumbnail = thumbnailInput ? thumbnailInput.value.trim() : '';
-        const thumbnailEnabled = thumbnailEnabledInput ? thumbnailEnabledInput.checked : true;
-        const { scale: thumbnailScale, posX: thumbnailPosX, posY: thumbnailPosY } = this.getThumbnailAdjustValues();
         const originalBtnText = saveBtn.textContent;
         
         const titleError = utils.validateTitle(title);
         const codeError = utils.validateCode(code);
-        const thumbnailError = utils.validateThumbnail(thumbnail);
         
-        if (titleError || codeError || thumbnailError) {
-            this.showToast(titleError || codeError || thumbnailError, 'error');
+        if (titleError || codeError) {
+            this.showToast(titleError || codeError, 'error');
             this.actionInProgress = false;
             return;
         }
@@ -1397,11 +1226,6 @@ const app = {
                 displayTitle: title,
                 visibility: visibility,
                 description: desc,
-                thumbnail: thumbnail,
-                thumbnailEnabled: thumbnailEnabled,
-                thumbnailScale: thumbnailScale,
-                thumbnailPosX: thumbnailPosX,
-                thumbnailPosY: thumbnailPosY,
                 filename: filename,
                 size: code.length,
                 created: originalCreationDate,
@@ -1599,7 +1423,15 @@ const app = {
             body: JSON.stringify(body)
         });
         
-        if (!putRes.ok) throw new Error(`Failed to create/update file ${path}`);
+        if (!putRes.ok) {
+            let detail = `HTTP ${putRes.status}`;
+            try {
+                const errorBody = await putRes.json();
+                if (errorBody?.message) detail += `: ${errorBody.message}`;
+                if (errorBody?.documentation_url) detail += ` (${errorBody.documentation_url})`;
+            } catch (_) {}
+            throw new Error(`Failed to create/update file ${path} — ${detail}`);
+        }
     },
 
     handleRouting() {

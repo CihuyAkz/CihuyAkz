@@ -9,12 +9,7 @@
       "filename": "example-script.lua",
       "size": 259,
       "created": "2026-09-24T00:00:00.000Z",
-      "updated": "2026-09-24T00:00:00.000Z",
-      "thumbnail": "assets/example-thumbnail.jpg",
-      "thumbnailEnabled": true,
-      "thumbnailScale": 1,
-      "thumbnailPosX": 50,
-      "thumbnailPosY": 50
+      "updated": "2026-09-24T00:00:00.000Z"
     }
   },
   "bots": {}
