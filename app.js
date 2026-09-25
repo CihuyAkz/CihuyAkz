@@ -1,6 +1,6 @@
 const CONFIG = {
     // GitHub repository used for publishing. Only this GitHub account may log in.
-    repoOwner: 'simplyIeaf',
+    repoOwner: 'CihuyAkz',
     repo: 'simplyIeaf.github.io',
     allowedUser: 'CihuyAkz',
     branch: 'main',
