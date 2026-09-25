@@ -208,30 +208,6 @@
                             </div>
                         </div>
 
-                        <div class="page-settings-card linkvertise-settings-card">
-                            <div class="section-heading">
-                                <div>
-                                    <h4>Linkvertise Protection</h4>
-                                    <p>Pengunjung harus melewati Linkvertise sebelum melihat semua script di page.</p>
-                                </div>
-                                <label class="switch" title="Aktifkan Linkvertise">
-                                    <input type="checkbox" id="edit-lv-enabled" onchange="app.updateLinkvertiseFields()">
-                                    <span class="switch-track"></span>
-                                </label>
-                            </div>
-                            <div id="linkvertise-fields" class="linkvertise-fields is-disabled">
-                                <div class="form-group">
-                                    <label>Linkvertise URL</label>
-                                    <input type="url" id="edit-lv-url" class="input-field" placeholder="https://linkvertise.com/..." autocomplete="off">
-                                </div>
-                                <div class="form-group">
-                                    <label>Verification Endpoint</label>
-                                    <input type="url" id="edit-lv-endpoint" class="input-field" placeholder="https://your-worker.example.workers.dev" autocomplete="off">
-                                    <p class="field-help">Endpoint ini melakukan verifikasi hash anti-bypass di server. Token Linkvertise jangan ditaruh di frontend.</p>
-                                </div>
-                            </div>
-                        </div>
-
                         <div class="scripts-builder-card">
                             <div class="section-heading scripts-section-heading">
                                 <div>
@@ -283,9 +259,9 @@
                             <span class="stat-hint">Total script items</span>
                         </div>
                         <div class="stat-card">
-                            <span class="stat-label">PROTECTED</span>
-                            <strong id="protected-count">0</strong>
-                            <span class="stat-hint">Linkvertise pages</span>
+                            <span class="stat-label">PUBLIC</span>
+                            <strong id="public-pages-count">0</strong>
+                            <span class="stat-hint">Public pages</span>
                         </div>
                     </div>
                     <div class="admin-list-header">

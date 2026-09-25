@@ -1,6 +1,0 @@
-name = "cihuyakz-linkvertise-verifier"
-main = "linkvertise-worker.js"
-compatibility_date = "2026-09-25"
-
-# Set the secret with:
-# npx wrangler secret put LINKVERTISE_TOKEN

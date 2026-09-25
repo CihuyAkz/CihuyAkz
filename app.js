@@ -465,7 +465,6 @@ const app = {
                 displayTitle: pageTitle,
                 visibility: legacy?.visibility || 'PUBLIC',
                 description: legacy?.description || '',
-                linkvertise: { enabled: false, url: '', verificationEndpoint: '' },
                 scripts: [{
                     id: utils.sanitizeTitle(legacyTitle),
                     name: legacy?.displayTitle || legacyTitle,
@@ -486,11 +485,6 @@ const app = {
             page.displayTitle = page.displayTitle || page.title;
             page.visibility = page.visibility || 'PUBLIC';
             page.description = page.description || '';
-            page.linkvertise = {
-                enabled: !!page?.linkvertise?.enabled,
-                url: page?.linkvertise?.url || '',
-                verificationEndpoint: page?.linkvertise?.verificationEndpoint || ''
-            };
             page.scripts = Array.isArray(page.scripts) ? page.scripts : [];
         }
     },
@@ -751,7 +745,6 @@ const app = {
         list.innerHTML = sorted.map(page => {
             const pageId = page.id || utils.sanitizeTitle(page.title);
             const scriptsCount = Array.isArray(page.scripts) ? page.scripts.length : 0;
-            const protectedBadge = page?.linkvertise?.enabled ? `<span class="security-badge"><span class="security-dot"></span> Linkvertise</span>` : '';
             const scriptNames = (page.scripts || []).slice(0, 3).map(script => utils.escapeHtml(script.name || '')).join(' · ');
             const pagePath = page.legacy ? `scripts/${encodeURIComponent(pageId)}/index.html` : `pages/${encodeURIComponent(pageId)}/index.html`;
             return `<article class="script-card page-card" onclick="window.location.href='${pagePath}'">
@@ -770,7 +763,6 @@ const app = {
                         <span>${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
                         <span class="page-open">Open <span>→</span></span>
                     </div>
-                    ${protectedBadge}
                 </div>
             </article>`;
         }).join('');
@@ -867,14 +859,13 @@ const app = {
         const sorted = filtered.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
         const botsCount = Object.keys(this.db.bots || {}).length;
         const totalScripts = pages.reduce((sum, page) => sum + (page.scripts || []).length, 0);
-        const protectedCount = pages.filter(page => page?.linkvertise?.enabled).length;
         document.getElementById('total-stats').textContent = `${pages.length} Pages · ${totalScripts} Scripts · ${botsCount} Bots`;
         const pageCountEl = document.getElementById('pages-count');
         const scriptCountEl = document.getElementById('scripts-count');
-        const protectedCountEl = document.getElementById('protected-count');
         if (pageCountEl) pageCountEl.textContent = pages.length;
         if (scriptCountEl) scriptCountEl.textContent = totalScripts;
-        if (protectedCountEl) protectedCountEl.textContent = protectedCount;
+        const publicPagesCountEl = document.getElementById('public-pages-count');
+        if (publicPagesCountEl) publicPagesCountEl.textContent = pages.filter(page => page.visibility === 'PUBLIC').length;
 
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-admin-state">
@@ -887,9 +878,8 @@ const app = {
         list.innerHTML = sorted.map(page => {
             const updated = page.updated ? new Date(page.updated).toLocaleDateString('id-ID') : new Date(page.created).toLocaleDateString('id-ID');
             const scriptsCount = (page.scripts || []).length;
-            const protectedClass = page?.linkvertise?.enabled ? 'is-protected' : '';
             const pagePayload = encodeURIComponent(page.title);
-            return `<div class="admin-item page-admin-item ${protectedClass}" data-page-title="${utils.escapeHtml(page.title)}" onclick="app.populateEditor(decodeURIComponent('${pagePayload}'))">
+            return `<div class="admin-item page-admin-item" data-page-title="${utils.escapeHtml(page.title)}" onclick="app.populateEditor(decodeURIComponent('${pagePayload}'))">
                 <div class="admin-item-main">
                     <div class="admin-item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
                     <div class="admin-item-left">
@@ -897,7 +887,6 @@ const app = {
                         <div class="admin-meta">
                             <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
                             <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
-                            ${page?.linkvertise?.enabled ? '<span class="lv-pill"><span></span> LV Protected</span>' : ''}
                             <span class="text-muted">Updated ${updated}</span>
                         </div>
                     </div>
@@ -1240,29 +1229,12 @@ const app = {
         const title = document.getElementById('edit-title');
         const visibility = document.getElementById('edit-visibility');
         const desc = document.getElementById('edit-desc');
-        const lvEnabled = document.getElementById('edit-lv-enabled');
-        const lvUrl = document.getElementById('edit-lv-url');
-        const lvEndpoint = document.getElementById('edit-lv-endpoint');
         if (title) title.value = '';
         if (visibility) visibility.value = 'PUBLIC';
         if (desc) desc.value = '';
-        if (lvEnabled) lvEnabled.checked = false;
-        if (lvUrl) lvUrl.value = '';
-        if (lvEndpoint) lvEndpoint.value = '';
-        this.updateLinkvertiseFields();
         const list = document.getElementById('script-editor-list');
         if (list) list.innerHTML = '';
         this.addScriptEditor();
-    },
-
-    updateLinkvertiseFields() {
-        const enabled = !!document.getElementById('edit-lv-enabled')?.checked;
-        const wrap = document.getElementById('linkvertise-fields');
-        if (wrap) wrap.classList.toggle('is-disabled', !enabled);
-        ['edit-lv-url', 'edit-lv-endpoint'].forEach(id => {
-            const input = document.getElementById(id);
-            if (input) input.disabled = !enabled;
-        });
     },
 
     updateScriptEditorCount() {
@@ -1342,10 +1314,6 @@ const app = {
         document.getElementById('edit-title').value = page.title || '';
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
         document.getElementById('edit-desc').value = page.description || '';
-        document.getElementById('edit-lv-enabled').checked = !!page?.linkvertise?.enabled;
-        document.getElementById('edit-lv-url').value = page?.linkvertise?.url || '';
-        document.getElementById('edit-lv-endpoint').value = page?.linkvertise?.verificationEndpoint || '';
-        this.updateLinkvertiseFields();
 
         const list = document.getElementById('script-editor-list');
         list.innerHTML = '';
@@ -1464,16 +1432,10 @@ const app = {
         const titleInput = document.getElementById('edit-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
-        const lvEnabledInput = document.getElementById('edit-lv-enabled');
-        const lvUrlInput = document.getElementById('edit-lv-url');
-        const lvEndpointInput = document.getElementById('edit-lv-endpoint');
         const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
         const title = titleInput?.value.trim() || '';
         const visibility = visibilityInput?.value || 'PUBLIC';
         const desc = descInput?.value.trim() || '';
-        const lvEnabled = !!lvEnabledInput?.checked;
-        const lvUrl = lvUrlInput?.value.trim() || '';
-        const lvEndpoint = lvEndpointInput?.value.trim() || '';
         const scripts = this.collectEditorScripts();
         const isEditing = !!this.currentEditingPageTitle;
         const oldPage = isEditing ? this.db.pages[this.currentEditingPageTitle] : null;
@@ -1495,10 +1457,6 @@ const app = {
                 const codeError = utils.validateCode(script.code);
                 if (codeError) throw new Error(`Script "${script.name}": ${codeError}`);
             }
-            if (lvEnabled) {
-                if (!/^https?:\/\//i.test(lvUrl)) throw new Error('Linkvertise URL harus berupa URL http(s).');
-                if (!/^https?:\/\//i.test(lvEndpoint)) throw new Error('Verification Endpoint wajib diisi saat Linkvertise Protection aktif.');
-            }
 
             if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Updating Page...' : 'Publishing Page...'; }
             if (typeof NProgress !== 'undefined') NProgress.start();
@@ -1510,7 +1468,6 @@ const app = {
                 displayTitle: title,
                 visibility,
                 description: desc,
-                linkvertise: { enabled: lvEnabled, url: lvUrl, verificationEndpoint: lvEndpoint },
                 scripts: scripts.map(script => ({
                     id: script.id,
                     name: script.name,
@@ -1589,13 +1546,6 @@ const app = {
     generatePageViewerHTML(page) {
         const escapedTitle = utils.escapeHtml(page.title);
         const manifest = this.safeJsonForScript((page.scripts || []).map(script => ({ id: script.id, name: script.name, filename: script.filename })));
-        const lvConfig = this.safeJsonForScript({
-            enabled: !!page?.linkvertise?.enabled,
-            url: page?.linkvertise?.url || '',
-            verificationEndpoint: page?.linkvertise?.verificationEndpoint || ''
-        });
-        const pageIdJson = this.safeJsonForScript(page.id);
-        const ownerJson = this.safeJsonForScript(CONFIG.ownerLogin);
         const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
         const created = new Date(page.created || Date.now()).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -1626,7 +1576,7 @@ const app = {
     </nav>
 
     <main class="container script-page-container">
-        <section id="script-content" class="script-page-content" aria-hidden="true">
+        <section id="script-content" class="script-page-content">
             <div class="script-header-lg page-hero-header">
                 <div>
                     <span class="page-kicker">SCRIPT PAGE</span>
@@ -1634,7 +1584,6 @@ const app = {
                     <div class="meta-row">
                         <span class="meta-badge">${(page.scripts || []).length} scripts</span>
                         <span class="meta-badge">Updated ${created}</span>
-                        ${page?.linkvertise?.enabled ? '<span class="meta-badge meta-badge-security">Linkvertise Protected</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -1642,72 +1591,27 @@ const app = {
             <div id="page-script-tabs" class="page-script-tabs"></div>
             <div id="page-script-panels" class="page-script-panels"></div>
         </section>
-
-        <section id="lv-gate" class="access-gate" aria-live="polite">
-            <div class="access-gate-glow"></div>
-            <div class="access-card">
-                <div class="access-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"></path><path d="M9 12l2 2 4-4"></path></svg></div>
-                <span class="page-kicker">ACCESS CHECK</span>
-                <h1>Verify with Linkvertise</h1>
-                <p>Lengkapi langkah Linkvertise terlebih dahulu untuk membuka semua script di page ini.</p>
-                <button id="lv-start-btn" class="btn btn-full" type="button">Continue with Linkvertise</button>
-                <button id="lv-verify-btn" class="btn btn-secondary btn-full" type="button">Saya sudah kembali — Verify</button>
-                <a class="gate-back-link" href="../../index.html">← Kembali ke library</a>
-                <div id="lv-status" class="gate-status"></div>
-            </div>
-        </section>
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
     <script>
-        const PAGE_ID = ${pageIdJson};
-        const OWNER_LOGIN = ${ownerJson};
         const SCRIPTS = ${manifest};
-        const LV = ${lvConfig};
 
-        const gate = document.getElementById('lv-gate');
-        const content = document.getElementById('script-content');
-        const statusEl = document.getElementById('lv-status');
-        const verifyBtn = document.getElementById('lv-verify-btn');
-        const startBtn = document.getElementById('lv-start-btn');
-
-        function setStatus(message, type) {
-            statusEl.textContent = message || '';
-            statusEl.className = 'gate-status' + (type ? ' ' + type : '');
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
         }
 
-        function isOwnerSession() {
-            try {
-                const token = localStorage.getItem('gh_token');
-                const expiry = Number(localStorage.getItem('gh_token_expiry') || 0);
-                const user = JSON.parse(localStorage.getItem('gh_user') || 'null');
-                return !!token && expiry > Date.now() && user?.login?.toLowerCase() === OWNER_LOGIN.toLowerCase();
-            } catch (_) {
-                return false;
-            }
-        }
-
-        function getHash() {
-            try { return new URLSearchParams(window.location.search).get('hash') || ''; } catch (_) { return ''; }
-        }
-
-        let pageRendered = false;
-        function unlock() {
-            if (!pageRendered) {
-                pageRendered = true;
-                renderScripts();
-            }
-            gate.hidden = true;
-            content.setAttribute('aria-hidden', 'false');
-            if (history.replaceState && getHash()) history.replaceState({}, document.title, window.location.pathname);
-        }
+        const sourceCache = {};
+        const tabs = document.getElementById('page-script-tabs');
+        const panels = document.getElementById('page-script-panels');
 
         function renderScripts() {
-            const tabs = document.getElementById('page-script-tabs');
-            const panels = document.getElementById('page-script-panels');
             tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
             panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Copy</button><button class="btn btn-sm" type="button" data-download="' + index + '">Download</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Loading...</code></pre></div></section>').join('');
+
             tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
                 const index = Number(tab.dataset.index);
                 tabs.querySelectorAll('.page-script-tab').forEach(item => item.classList.toggle('active', Number(item.dataset.index) === index));
@@ -1718,13 +1622,6 @@ const app = {
             loadScriptSources();
         }
 
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text == null ? '' : String(text);
-            return div.innerHTML;
-        }
-
-        const sourceCache = {};
         async function loadScriptSources() {
             await Promise.all(SCRIPTS.map(async (script, index) => {
                 try {
@@ -1767,62 +1664,7 @@ const app = {
             setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
         }
 
-        async function verifyLinkvertise() {
-            const hash = getHash();
-            if (!LV.verificationEndpoint) {
-                setStatus('Verification endpoint belum dikonfigurasi oleh Owner.', 'error');
-                return;
-            }
-            if (!/^[a-f0-9]{64}$/i.test(hash)) {
-                setStatus('Hash verifikasi Linkvertise tidak ditemukan. Selesaikan Linkvertise lalu kembali ke page ini.', 'error');
-                return;
-            }
-            verifyBtn.disabled = true;
-            startBtn.disabled = true;
-            setStatus('Memverifikasi akses...', 'loading');
-            try {
-                const endpoint = new URL(LV.verificationEndpoint);
-                endpoint.searchParams.set('hash', hash);
-                endpoint.searchParams.set('page', PAGE_ID);
-                const response = await fetch(endpoint.toString(), {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-                    body: JSON.stringify({ hash })
-                });
-                const text = await response.text();
-                let verified = false;
-                try {
-                    const parsed = JSON.parse(text);
-                    verified = parsed?.verified === true || parsed?.success === true;
-                } catch (_) {
-                    verified = text.trim().toUpperCase() === 'TRUE';
-                }
-                if (!response.ok || !verified) throw new Error('Hash tidak valid atau sudah digunakan.');
-                setStatus('Verifikasi berhasil.', 'success');
-                unlock();
-            } catch (error) {
-                setStatus(error.message || 'Verifikasi gagal. Coba ulangi dari Linkvertise.', 'error');
-                verifyBtn.disabled = false;
-                startBtn.disabled = false;
-            }
-        }
-
-        startBtn.addEventListener('click', () => {
-            if (!LV.url) {
-                setStatus('Linkvertise URL belum dikonfigurasi.', 'error');
-                return;
-            }
-            window.location.href = LV.url;
-        });
-        verifyBtn.addEventListener('click', verifyLinkvertise);
-
-        if (isOwnerSession() || !LV.enabled) {
-            unlock();
-        } else if (getHash()) {
-            verifyLinkvertise();
-        } else {
-            setStatus('Akses dilindungi Linkvertise.');
-        }
+        renderScripts();
     </script>
 </body>
 </html>`;
