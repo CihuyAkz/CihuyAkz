@@ -3,6 +3,7 @@ const CONFIG = {
     repoOwner: 'CihuyAkz',
     repo: 'CihuyAkz',
     allowedUser: 'CihuyAkz',
+    ownerLogin: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
 
@@ -98,6 +99,11 @@ const app = {
     currentBotId: null,
     isLoading: false,
     searchQuery: '',
+    adminSearchQuery: '',
+    pageEditors: {},
+    pageEditorCounter: 0,
+    currentEditingPageTitle: null,
+    originalPageId: null,
     scheduledTimers: {},
     
     async init() {
@@ -113,9 +119,9 @@ const app = {
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 if (location.hash === '#admin') {
-                    const activeTab = document.querySelector('.tab-btn.active').textContent.toLowerCase();
-                    if (activeTab.includes('add new')) {
-                        this.saveScript();
+                    const activeTab = document.querySelector('.tab-btn.active')?.textContent?.toLowerCase() || '';
+                    if (activeTab.includes('add new') || activeTab.includes('manage')) {
+                        if (document.getElementById('admin-tab-editor')?.style.display !== 'none') this.savePage();
                     } else if (activeTab.includes('bots') || activeTab.includes('create bot')) {
                         this.saveBot();
                     }
@@ -166,6 +172,33 @@ const app = {
                 indentUnit: 4
             });
         }
+    },
+
+    initPageCodeEditor(editorId, textarea) {
+        if (!textarea || typeof CodeMirror === 'undefined') return;
+        if (this.pageEditors[editorId]) {
+            this.pageEditors[editorId].refresh();
+            return;
+        }
+        const cm = CodeMirror.fromTextArea(textarea, {
+            mode: 'lua',
+            theme: 'monokai',
+            lineNumbers: true,
+            lineWrapping: true,
+            matchBrackets: true,
+            indentUnit: 4,
+            viewportMargin: 40
+        });
+        cm.on('change', () => this.updateScriptEditorCount());
+        this.pageEditors[editorId] = cm;
+        requestAnimationFrame(() => cm.refresh());
+    },
+
+    destroyPageEditors() {
+        Object.values(this.pageEditors).forEach(editor => {
+            try { editor.toTextArea(); } catch (_) {}
+        });
+        this.pageEditors = {};
     },
 
     async loadSession() {
@@ -263,18 +296,34 @@ const app = {
     },
     
     showToast(message, type = 'success') {
-        if (typeof Toastify !== 'undefined') {
-            Toastify({
-                text: message,
-                duration: 3000,
-                gravity: "top",
-                position: "right",
-                style: { background: type === 'success' ? "#10b981" : type === 'error' ? "#ef4444" : "#f59e0b" },
-                stopOnFocus: true
-            }).showToast();
-        } else {
+        if (typeof Toastify === 'undefined') {
             alert(message);
+            return;
         }
+
+        const toast = Toastify({
+            text: message,
+            duration: 3500,
+            gravity: 'top',
+            position: 'right',
+            close: true,
+            stopOnFocus: false,
+            style: {
+                background: type === 'success'
+                    ? 'linear-gradient(135deg, #0f766e, #14b8a6)'
+                    : type === 'error'
+                        ? 'linear-gradient(135deg, #991b1b, #ef4444)'
+                        : 'linear-gradient(135deg, #92400e, #f59e0b)'
+            }
+        });
+        toast.showToast();
+        requestAnimationFrame(() => {
+            const el = toast.toastElement;
+            if (!el) return;
+            el.style.cursor = 'pointer';
+            el.setAttribute('role', 'status');
+            el.addEventListener('pointerup', () => toast.hideToast(), { once: true });
+        });
     },
 
     logout(silent = false) {
@@ -353,8 +402,7 @@ const app = {
             const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
-                if (!this.db.scripts) this.db.scripts = {};
-                if (!this.db.bots) this.db.bots = {};
+                this.normalizeDatabase();
                 this.renderList();
                 this.renderAdminList();
                 return;
@@ -367,8 +415,7 @@ const app = {
             if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
 
             this.db = await localRes.json();
-            if (!this.db.scripts) this.db.scripts = {};
-            if (!this.db.bots) this.db.bots = {};
+            this.normalizeDatabase();
             try {
                 localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
@@ -397,6 +444,54 @@ const app = {
             this.showToast(`Error: ${e.message}`, 'error');
         } finally {
             this.isLoading = false;
+        }
+    },
+
+    normalizeDatabase() {
+        if (!this.db || typeof this.db !== 'object') this.db = {};
+        if (!this.db.pages || typeof this.db.pages !== 'object') this.db.pages = {};
+        if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
+        if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
+
+        // Backward compatibility: convert legacy one-script records into one-script pages.
+        for (const [legacyTitle, legacy] of Object.entries(this.db.scripts)) {
+            const pageTitle = legacy?.title || legacyTitle;
+            if (this.db.pages[pageTitle]) continue;
+            const pageId = utils.sanitizeTitle(pageTitle);
+            const legacyFilename = legacy?.filename || `${pageId}.lua`;
+            this.db.pages[pageTitle] = {
+                id: pageId,
+                title: pageTitle,
+                displayTitle: pageTitle,
+                visibility: legacy?.visibility || 'PUBLIC',
+                description: legacy?.description || '',
+                linkvertise: { enabled: false, url: '', verificationEndpoint: '' },
+                scripts: [{
+                    id: utils.sanitizeTitle(legacyTitle),
+                    name: legacy?.displayTitle || legacyTitle,
+                    filename: legacyFilename,
+                    size: legacy?.size || 0,
+                    created: legacy?.created || new Date().toISOString(),
+                    updated: legacy?.updated || legacy?.created || new Date().toISOString()
+                }],
+                created: legacy?.created || new Date().toISOString(),
+                updated: legacy?.updated || legacy?.created || new Date().toISOString(),
+                legacy: true
+            };
+        }
+
+        for (const [title, page] of Object.entries(this.db.pages)) {
+            page.id = page.id || utils.sanitizeTitle(title);
+            page.title = page.title || title;
+            page.displayTitle = page.displayTitle || page.title;
+            page.visibility = page.visibility || 'PUBLIC';
+            page.description = page.description || '';
+            page.linkvertise = {
+                enabled: !!page?.linkvertise?.enabled,
+                url: page?.linkvertise?.url || '',
+                verificationEndpoint: page?.linkvertise?.verificationEndpoint || ''
+            };
+            page.scripts = Array.isArray(page.scripts) ? page.scripts : [];
         }
     },
 
@@ -638,55 +733,69 @@ const app = {
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-        
-        const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
-        const filtered = this.filterLogic(scripts);
+        this.normalizeDatabase();
+
+        const pages = Object.entries(this.db.pages || {}).map(([title, data]) => ({ title, ...data }));
+        const filtered = this.filterLogic(pages);
         const sorted = this.sortLogic(filtered);
-        
+
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
-                <h2>No scripts found</h2>
+                <div class="empty-state-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
+                <h2>No pages found</h2>
                 <p>Try adjusting your search or filter</p>
             </div>`;
             return;
         }
-        
-        list.innerHTML = sorted.map(s => {
-            const scriptId = utils.sanitizeTitle(s.title);
-            return `<div class="script-card" onclick="window.location.href='scripts/${scriptId}/index.html'">
+
+        list.innerHTML = sorted.map(page => {
+            const pageId = page.id || utils.sanitizeTitle(page.title);
+            const scriptsCount = Array.isArray(page.scripts) ? page.scripts.length : 0;
+            const protectedBadge = page?.linkvertise?.enabled ? `<span class="security-badge"><span class="security-dot"></span> Linkvertise</span>` : '';
+            const scriptNames = (page.scripts || []).slice(0, 3).map(script => utils.escapeHtml(script.name || '')).join(' · ');
+            const pagePath = page.legacy ? `scripts/${encodeURIComponent(pageId)}/index.html` : `pages/${encodeURIComponent(pageId)}/index.html`;
+            return `<article class="script-card page-card" onclick="window.location.href='${pagePath}'">
+                <div class="card-glow"></div>
                 <div class="card-content">
                     <div class="card-header-section">
-                        <h3 class="script-title">${utils.escapeHtml(s.title)}</h3>
-                        ${s.visibility !== 'PUBLIC' ? `<span class="badge badge-${s.visibility.toLowerCase()}">${s.visibility}</span>` : ''}
+                        <div>
+                            <span class="page-kicker">PAGE</span>
+                            <h3 class="script-title">${utils.escapeHtml(page.title)}</h3>
+                        </div>
+                        ${page.visibility !== 'PUBLIC' ? `<span class="badge badge-${page.visibility.toLowerCase()}">${page.visibility}</span>` : ''}
                     </div>
-                    ${s.description ? `<p style="color:var(--color-text-muted);font-size:13px;margin:8px 0">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
+                    ${page.description ? `<p class="page-description">${utils.escapeHtml(page.description.substring(0, 170))}${page.description.length > 170 ? '...' : ''}</p>` : ''}
+                    <div class="page-script-preview">${scriptNames || 'No script items yet'}</div>
                     <div class="card-meta">
-                        <span>${new Date(s.created).toLocaleDateString()}</span>
-                        ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
+                        <span>${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
+                        <span class="page-open">Open <span>→</span></span>
                     </div>
+                    ${protectedBadge}
                 </div>
-            </div>`;
+            </article>`;
         }).join('');
     },
 
-    filterLogic(scripts) {
+    filterLogic(items) {
         const query = this.searchQuery.toLowerCase();
-        return scripts.filter(s => {
-            if (!s.title.toLowerCase().includes(query)) return false;
-            if (s.visibility === 'PRIVATE' && !this.currentUser) return false;
-            if (s.visibility === 'UNLISTED' && !this.currentUser) return false;
-            if (this.currentFilter === 'private' && s.visibility !== 'PRIVATE') return false;
-            if (this.currentFilter === 'public' && s.visibility !== 'PUBLIC') return false;
-            if (this.currentFilter === 'unlisted' && s.visibility !== 'UNLISTED') return false;
+        return items.filter(item => {
+            const pageText = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+            const scriptText = (item.scripts || []).map(s => s.name || '').join(' ').toLowerCase();
+            if (query && !pageText.includes(query) && !scriptText.includes(query)) return false;
+            if (item.visibility === 'PRIVATE' && !this.currentUser) return false;
+            if (item.visibility === 'UNLISTED' && !this.currentUser) return false;
+            if (this.currentFilter === 'private' && item.visibility !== 'PRIVATE') return false;
+            if (this.currentFilter === 'public' && item.visibility !== 'PUBLIC') return false;
+            if (this.currentFilter === 'unlisted' && item.visibility !== 'UNLISTED') return false;
             return true;
         });
     },
 
-    sortLogic(scripts) {
-        return scripts.sort((a, b) => {
+    sortLogic(items) {
+        return items.sort((a, b) => {
             if (this.currentSort === 'newest') return new Date(b.created || 0) - new Date(a.created || 0);
             if (this.currentSort === 'oldest') return new Date(a.created || 0) - new Date(b.created || 0);
-            if (this.currentSort === 'alpha') return a.title.localeCompare(b.title);
+            if (this.currentSort === 'alpha') return (a.title || '').localeCompare(b.title || '');
             if (this.currentSort === 'updated') return new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0);
             return 0;
         });
@@ -695,8 +804,9 @@ const app = {
     filterCategory(cat, e) {
         if (e) {
             e.preventDefault();
+            const target = e.currentTarget || e.target;
             document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
-            if (e.target.classList.contains('sidebar-link')) e.target.classList.add('active');
+            if (target?.classList?.contains('sidebar-link')) target.classList.add('active');
         }
         this.currentFilter = cat;
         this.renderList();
@@ -707,68 +817,101 @@ const app = {
         this.renderList();
     },
 
+    setAdminSearch(value) {
+        this.adminSearchQuery = (value || '').trim().toLowerCase();
+        this.renderAdminList();
+    },
+
     switchAdminTab(tab) {
         if (tab === 'admin' && !this.currentUser) {
             location.hash = '';
             return;
         }
-        
         document.querySelectorAll('.admin-tab').forEach(t => t.style.display = 'none');
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        
+        const activeKey = (tab === 'create-bot' || tab === 'create-edit') ? 'create' : tab;
+        const activeTab = document.querySelector(`.tab-btn[data-admin-tab="${activeKey}"]`);
+
         if (tab === 'list') {
             document.getElementById('admin-tab-list').style.display = 'block';
-            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            activeTab?.classList.add('active');
             this.renderAdminList();
         } else if (tab === 'bots') {
             document.getElementById('admin-tab-bots').style.display = 'block';
-            document.querySelectorAll('.tab-btn')[2].classList.add('active');
+            activeTab?.classList.add('active');
             this.renderBotsList();
         } else if (tab === 'create-bot') {
             document.getElementById('admin-tab-bot-editor').style.display = 'block';
-            document.querySelectorAll('.tab-btn')[2].classList.add('active');
+            activeTab?.classList.add('active');
             this.resetBotEditor();
         } else {
             document.getElementById('admin-tab-editor').style.display = 'block';
-            document.querySelectorAll('.tab-btn')[1].classList.add('active');
-            if (tab === 'create') {
-                this.resetEditor();
-            }
+            activeTab?.classList.add('active');
+            if (tab === 'create') this.resetEditor();
             setTimeout(() => {
-                this.initCodeMirror();
-                if (window.cmEditor) window.cmEditor.refresh();
-            }, 50);
+                Object.values(this.pageEditors).forEach(editor => editor.refresh());
+            }, 80);
         }
     },
 
     async renderAdminList() {
         if (!this.currentUser || !this.db) return;
+        this.normalizeDatabase();
         const list = document.getElementById('admin-list');
-        const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
-        const sorted = scripts.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
+        const pages = Object.entries(this.db.pages || {}).map(([title, data]) => ({ title, ...data }));
+        const query = this.adminSearchQuery;
+        const filtered = query ? pages.filter(page => {
+            const haystack = `${page.title} ${page.description || ''} ${(page.scripts || []).map(s => s.name).join(' ')}`.toLowerCase();
+            return haystack.includes(query);
+        }) : pages;
+        const sorted = filtered.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
         const botsCount = Object.keys(this.db.bots || {}).length;
-        document.getElementById('total-stats').textContent = `${scripts.length} Scripts, ${botsCount} Bots`;
+        const totalScripts = pages.reduce((sum, page) => sum + (page.scripts || []).length, 0);
+        const protectedCount = pages.filter(page => page?.linkvertise?.enabled).length;
+        document.getElementById('total-stats').textContent = `${pages.length} Pages · ${totalScripts} Scripts · ${botsCount} Bots`;
+        const pageCountEl = document.getElementById('pages-count');
+        const scriptCountEl = document.getElementById('scripts-count');
+        const protectedCountEl = document.getElementById('protected-count');
+        if (pageCountEl) pageCountEl.textContent = pages.length;
+        if (scriptCountEl) scriptCountEl.textContent = totalScripts;
+        if (protectedCountEl) protectedCountEl.textContent = protectedCount;
+
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-admin-state"><p>No scripts yet. Click "Add New" to create your first script.</p></div>`;
+            list.innerHTML = `<div class="empty-admin-state">
+                <div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
+                <p>${query ? 'Tidak ada page yang cocok dengan pencarian.' : 'Belum ada page. Klik “New Page” untuk membuat page pertama.'}</p>
+            </div>`;
             return;
         }
-        list.innerHTML = sorted.map(s => {
-            const updated = s.updated ? new Date(s.updated).toLocaleDateString() : new Date(s.created).toLocaleDateString();
-            return `<div class="admin-item" data-script-title="${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}" onclick="app.populateEditor('${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}')">
-                <div class="admin-item-left">
-                    <strong>${utils.escapeHtml(s.title)}</strong>
-                    <div class="admin-meta">
-                        <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
-                        <span class="text-muted">Updated ${updated}</span>
+
+        list.innerHTML = sorted.map(page => {
+            const updated = page.updated ? new Date(page.updated).toLocaleDateString('id-ID') : new Date(page.created).toLocaleDateString('id-ID');
+            const scriptsCount = (page.scripts || []).length;
+            const protectedClass = page?.linkvertise?.enabled ? 'is-protected' : '';
+            const pagePayload = encodeURIComponent(page.title);
+            return `<div class="admin-item page-admin-item ${protectedClass}" data-page-title="${utils.escapeHtml(page.title)}" onclick="app.populateEditor(decodeURIComponent('${pagePayload}'))">
+                <div class="admin-item-main">
+                    <div class="admin-item-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
+                    <div class="admin-item-left">
+                        <strong>${utils.escapeHtml(page.title)}</strong>
+                        <div class="admin-meta">
+                            <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
+                            <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
+                            ${page?.linkvertise?.enabled ? '<span class="lv-pill"><span></span> LV Protected</span>' : ''}
+                            <span class="text-muted">Updated ${updated}</span>
+                        </div>
                     </div>
                 </div>
-                <div class="admin-item-right">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                <div class="admin-item-actions">
+                    <button class="icon-btn danger" title="Delete page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
+                    </button>
+                    <span class="admin-open-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
                 </div>
             </div>`;
         }).join('');
-        this.initSwipeToDelete();
     },
+
 
     renderBotsList() {
         if (!this.currentUser || !this.db) return;
@@ -1084,27 +1227,146 @@ const app = {
     },
 
     resetEditor() {
-        document.getElementById('editor-heading').textContent = 'Create New Script';
-        document.getElementById('edit-title').value = '';
-        document.getElementById('edit-visibility').value = 'PUBLIC';
-        
-        const editDesc = document.getElementById('edit-desc');
-        if (editDesc) editDesc.value = '';
-        
-        if (window.cmEditor) window.cmEditor.setValue('');
-        
-        const saveBtn = document.querySelector('.editor-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = 'Publish';
-        
-        const deleteBtn = document.querySelector('.btn-delete');
-        if (deleteBtn) deleteBtn.remove();
-        
-        const viewBtn = document.querySelector('.btn-view-script');
-        if (viewBtn) viewBtn.remove();
-        
-        this.currentEditingId = null;
+        this.currentEditingPageTitle = null;
         this.originalTitle = null;
-        this.originalScriptId = null;
+        this.originalPageId = null;
+        this.destroyPageEditors();
+        const heading = document.getElementById('editor-heading');
+        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
+        if (heading) heading.textContent = 'Create New Page';
+        if (saveBtn) saveBtn.textContent = 'Publish Page';
+        const status = document.getElementById('page-editor-status');
+        if (status) status.textContent = 'Draft';
+        const title = document.getElementById('edit-title');
+        const visibility = document.getElementById('edit-visibility');
+        const desc = document.getElementById('edit-desc');
+        const lvEnabled = document.getElementById('edit-lv-enabled');
+        const lvUrl = document.getElementById('edit-lv-url');
+        const lvEndpoint = document.getElementById('edit-lv-endpoint');
+        if (title) title.value = '';
+        if (visibility) visibility.value = 'PUBLIC';
+        if (desc) desc.value = '';
+        if (lvEnabled) lvEnabled.checked = false;
+        if (lvUrl) lvUrl.value = '';
+        if (lvEndpoint) lvEndpoint.value = '';
+        this.updateLinkvertiseFields();
+        const list = document.getElementById('script-editor-list');
+        if (list) list.innerHTML = '';
+        this.addScriptEditor();
+    },
+
+    updateLinkvertiseFields() {
+        const enabled = !!document.getElementById('edit-lv-enabled')?.checked;
+        const wrap = document.getElementById('linkvertise-fields');
+        if (wrap) wrap.classList.toggle('is-disabled', !enabled);
+        ['edit-lv-url', 'edit-lv-endpoint'].forEach(id => {
+            const input = document.getElementById(id);
+            if (input) input.disabled = !enabled;
+        });
+    },
+
+    updateScriptEditorCount() {
+        const list = document.getElementById('script-editor-list');
+        const countEl = document.getElementById('script-editor-count');
+        const count = list ? list.querySelectorAll('.script-editor-card').length : 0;
+        if (countEl) countEl.textContent = `${count} script${count === 1 ? '' : 's'}`;
+    },
+
+    addScriptEditor(script = null, code = '') {
+        const list = document.getElementById('script-editor-list');
+        if (!list) return null;
+        this.pageEditorCounter += 1;
+        const editorId = `page-editor-${Date.now()}-${this.pageEditorCounter}`;
+        const card = document.createElement('div');
+        card.className = 'script-editor-card';
+        card.dataset.editorId = editorId;
+        if (script?.id) card.dataset.scriptId = script.id;
+        if (script?.filename) card.dataset.filename = script.filename;
+        card.innerHTML = `
+            <div class="script-editor-card-head">
+                <div class="script-index-badge">SCRIPT</div>
+                <div class="script-editor-card-title-wrap">
+                    <input type="text" class="input-field script-name-input" placeholder="Nama Script" value="${utils.escapeHtml(script?.name || '')}">
+                </div>
+                <button class="icon-btn danger remove-script-btn" type="button" title="Hapus script" aria-label="Hapus script">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
+                </button>
+            </div>
+            <div class="script-editor-card-body">
+                <div class="form-group">
+                    <label>Lua Source</label>
+                    <textarea class="input-field page-code-textarea" data-editor-id="${editorId}">${utils.escapeHtml(code)}</textarea>
+                </div>
+            </div>`;
+        card.querySelector('.remove-script-btn').addEventListener('click', event => {
+            event.stopPropagation();
+            if (list.querySelectorAll('.script-editor-card').length <= 1) {
+                this.showToast('Satu script minimal harus ada di dalam page.', 'warning');
+                return;
+            }
+            const editor = this.pageEditors[editorId];
+            if (editor) {
+                try { editor.toTextArea(); } catch (_) {}
+                delete this.pageEditors[editorId];
+            }
+            card.remove();
+            this.updateScriptEditorCount();
+        });
+        list.appendChild(card);
+        const textarea = card.querySelector('.page-code-textarea');
+        this.initPageCodeEditor(editorId, textarea);
+        this.updateScriptEditorCount();
+        return editorId;
+    },
+
+    async populateEditor(title) {
+        if (!this.currentUser || !this.db?.pages?.[title]) {
+            this.normalizeDatabase();
+        }
+        if (!this.db?.pages?.[title]) {
+            this.showToast('Page not found', 'error');
+            return;
+        }
+        const page = this.db.pages[title];
+        this.currentEditingPageTitle = title;
+        this.originalTitle = title;
+        this.originalPageId = page.id || utils.sanitizeTitle(title);
+        this.destroyPageEditors();
+        this.switchAdminTab('create-edit');
+        const heading = document.getElementById('editor-heading');
+        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
+        const status = document.getElementById('page-editor-status');
+        if (heading) heading.textContent = `Edit: ${page.title}`;
+        if (saveBtn) saveBtn.textContent = 'Update Page';
+        if (status) status.textContent = 'Editing';
+        document.getElementById('edit-title').value = page.title || '';
+        document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
+        document.getElementById('edit-desc').value = page.description || '';
+        document.getElementById('edit-lv-enabled').checked = !!page?.linkvertise?.enabled;
+        document.getElementById('edit-lv-url').value = page?.linkvertise?.url || '';
+        document.getElementById('edit-lv-endpoint').value = page?.linkvertise?.verificationEndpoint || '';
+        this.updateLinkvertiseFields();
+
+        const list = document.getElementById('script-editor-list');
+        list.innerHTML = '';
+        const scripts = Array.isArray(page.scripts) ? page.scripts : [];
+        if (!scripts.length) {
+            this.addScriptEditor();
+            return;
+        }
+        for (const script of scripts) {
+            let code = '';
+            try {
+                const folder = page.legacy ? 'scripts' : 'pages';
+                const path = `${folder}/${encodeURIComponent(page.id || utils.sanitizeTitle(title))}/raw/${encodeURIComponent(script.filename)}`;
+                const res = await fetch(path, { cache: 'no-store' });
+                if (res.ok) code = await res.text();
+            } catch (error) {
+                console.warn('Could not load script source:', script.name, error);
+            }
+            this.addScriptEditor(script, code);
+        }
+        Object.values(this.pageEditors).forEach(editor => editor.refresh());
     },
 
     resetBotEditor() {
@@ -1118,67 +1380,6 @@ const app = {
         if (saveBtn) saveBtn.textContent = 'Send Bot';
         this.currentBotId = null;
         this.toggleScheduleFields();
-    },
-
-    toggleScheduleFields() {
-        const scheduleCheckbox = document.getElementById('bot-schedule');
-        const scheduleFields = document.getElementById('schedule-fields');
-        if (scheduleCheckbox && scheduleFields) {
-            scheduleFields.style.display = scheduleCheckbox.checked ? 'block' : 'none';
-            if (scheduleCheckbox.checked) {
-                const localDateTime = new Date().toISOString().slice(0, 16);
-                document.getElementById('bot-schedule-time').min = localDateTime;
-            }
-        }
-    },
-
-    async populateEditor(title) {
-        if (!this.currentUser || !this.db || !this.db.scripts[title]) return;
-        const s = this.db.scripts[title];
-        
-        this.currentEditingId = title;
-        this.originalTitle = title;
-        this.originalScriptId = utils.sanitizeTitle(title);
-        
-        this.switchAdminTab('create');
-        
-        document.getElementById('editor-heading').textContent = `Edit: ${title}`;
-        document.getElementById('edit-title').value = s.displayTitle || s.title;
-        document.getElementById('edit-visibility').value = s.visibility;
-        
-        const editDesc = document.getElementById('edit-desc');
-        if (editDesc) editDesc.value = s.description || '';
-        
-        try {
-            if (typeof NProgress !== 'undefined') NProgress.start();
-            const rawUrl = `${CONFIG.pagesBaseUrl()}scripts/${this.originalScriptId}/raw/${this.originalScriptId}.lua`;
-            const res = await fetch(rawUrl, { cache: 'no-store' });
-            
-            if (res.ok) {
-                const code = await res.text();
-                if (window.cmEditor) window.cmEditor.setValue(code);
-            } else {
-                if (window.cmEditor) window.cmEditor.setValue('-- Error loading content');
-            }
-        } catch(e) {
-            console.error('Load error:', e);
-            if (window.cmEditor) window.cmEditor.setValue('-- Error loading content');
-        } finally {
-            if (typeof NProgress !== 'undefined') NProgress.done();
-        }
-        
-        const saveBtn = document.querySelector('.editor-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = 'Update Script';
-        
-        const actionButtons = document.querySelector('.action-buttons');
-        let deleteBtn = document.querySelector('.btn-delete');
-        if (!deleteBtn && actionButtons) {
-            deleteBtn = document.createElement('button');
-            deleteBtn.className = 'btn btn-delete';
-            deleteBtn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg> Delete`;
-            deleteBtn.onclick = () => this.deleteScriptConfirmation(title);
-            actionButtons.appendChild(deleteBtn);
-        }
     },
 
     async populateBotEditor(botId) {
@@ -1234,147 +1435,188 @@ const app = {
     },
 
     async saveScript() {
+        return this.savePage();
+    },
+
+    async persistDatabase(message) {
+        if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
+        const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
+            method: 'PUT',
+            headers: { 'Authorization': `token ${this.token}`, 'Content-Type': 'application/json', 'Accept': 'application/vnd.github+json' },
+            body: JSON.stringify({ message, content: utils.safeBtoa(JSON.stringify(this.db, null, 2)), sha: this.dbSha, branch: CONFIG.branch })
+        });
+        if (!dbRes.ok) {
+            let detail = `HTTP ${dbRes.status}`;
+            try { const body = await dbRes.json(); if (body?.message) detail += `: ${body.message}`; } catch (_) {}
+            throw new Error(`Failed to update database — ${detail}`);
+        }
+        const newDbData = await dbRes.json();
+        this.dbSha = newDbData?.content?.sha || this.dbSha;
+    },
+
+    async savePage() {
         if (!this.currentUser || !this.db) {
             this.showToast('Please login first.', 'error');
             return;
         }
-        
         if (this.actionInProgress) return;
         this.actionInProgress = true;
-        
         const titleInput = document.getElementById('edit-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
-        const saveBtn = document.querySelector('.editor-actions .btn:last-child');
-        
-        if (!titleInput || !visibilityInput || !saveBtn) {
-            this.showToast('Form elements not found', 'error');
-            this.actionInProgress = false;
-            return;
-        }
-        
-        const title = titleInput.value.trim();
-        const visibility = visibilityInput.value;
-        const code = window.cmEditor ? window.cmEditor.getValue() : '';
-        const desc = descInput ? descInput.value.trim() : '';
-        const originalBtnText = saveBtn.textContent;
-        
+        const lvEnabledInput = document.getElementById('edit-lv-enabled');
+        const lvUrlInput = document.getElementById('edit-lv-url');
+        const lvEndpointInput = document.getElementById('edit-lv-endpoint');
+        const saveBtn = document.querySelector('#admin-tab-editor .editor-actions .btn:last-child');
+        const title = titleInput?.value.trim() || '';
+        const visibility = visibilityInput?.value || 'PUBLIC';
+        const desc = descInput?.value.trim() || '';
+        const lvEnabled = !!lvEnabledInput?.checked;
+        const lvUrl = lvUrlInput?.value.trim() || '';
+        const lvEndpoint = lvEndpointInput?.value.trim() || '';
+        const scripts = this.collectEditorScripts();
+        const isEditing = !!this.currentEditingPageTitle;
+        const oldPage = isEditing ? this.db.pages[this.currentEditingPageTitle] : null;
+        const oldPageId = this.originalPageId || oldPage?.id || null;
+        const pageId = utils.sanitizeTitle(title);
         const titleError = utils.validateTitle(title);
-        const codeError = utils.validateCode(code);
-        
-        if (titleError || codeError) {
-            this.showToast(titleError || codeError, 'error');
-            this.actionInProgress = false;
-            return;
-        }
-        
-        const isEditing = !!this.currentEditingId;
-        const newScriptId = utils.sanitizeTitle(title);
-        const filename = newScriptId + '.lua';
-        
-        saveBtn.disabled = true;
-        saveBtn.textContent = isEditing ? 'Updating...' : 'Publishing...';
-        
-        if (typeof NProgress !== 'undefined') NProgress.start();
-        
-        try {
-            let originalCreationDate = new Date().toISOString();
-            if (isEditing && this.db.scripts[this.originalTitle]) {
-                originalCreationDate = this.db.scripts[this.originalTitle].created;
-            }
-            
-            const scriptData = {
-                title: title,
-                displayTitle: title,
-                visibility: visibility,
-                description: desc,
-                filename: filename,
-                size: code.length,
-                created: originalCreationDate,
-                updated: new Date().toISOString()
-            };
-            
-            await this.createScriptFiles(newScriptId, filename, code, isEditing, this.originalScriptId);
-            this.db.scripts[title] = scriptData;
-            if (!this.db.bots) this.db.bots = {};
-            if (!this.dbSha) this.dbSha = await this.getRemoteDatabaseSha();
 
-            try {
-                localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
-            } catch (storageError) {
-                console.warn('Could not persist local database cache:', storageError);
-            }
-            
-            const dbRes = await fetch(`https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/database.json`, {
-                method: 'PUT',
-                headers: { 
-                    'Authorization': `token ${this.token}`,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    message: `${isEditing ? 'Update' : 'Add'} ${title}`,
-                    content: utils.safeBtoa(JSON.stringify(this.db, null, 2)),
-                    sha: this.dbSha
-                })
+        try {
+            if (titleError) throw new Error(titleError);
+            if (!pageId) throw new Error('Judul page menghasilkan URL yang tidak valid.');
+            const pageExists = Object.entries(this.db.pages).some(([existingTitle, page]) => {
+                if (isEditing && existingTitle === this.currentEditingPageTitle) return false;
+                return (page.id || utils.sanitizeTitle(existingTitle)) === pageId;
             });
-            
-            if (!dbRes.ok) throw new Error('Failed to update database');
-            
-            const newDbData = await dbRes.json();
-            this.dbSha = newDbData.content.sha;
-            
-            this.showToast(`${isEditing ? 'Updated' : 'Published'} successfully!`, 'success');
-            
-            this.currentEditingId = title;
+            if (pageExists) throw new Error('Page ID sudah dipakai oleh page lain. Gunakan judul yang berbeda.');
+            if (!scripts.length) throw new Error('Tambahkan minimal 1 script ke dalam page.');
+            for (const script of scripts) {
+                if (!script.name) throw new Error('Semua Script Name wajib diisi.');
+                const codeError = utils.validateCode(script.code);
+                if (codeError) throw new Error(`Script "${script.name}": ${codeError}`);
+            }
+            if (lvEnabled) {
+                if (!/^https?:\/\//i.test(lvUrl)) throw new Error('Linkvertise URL harus berupa URL http(s).');
+                if (!/^https?:\/\//i.test(lvEndpoint)) throw new Error('Verification Endpoint wajib diisi saat Linkvertise Protection aktif.');
+            }
+
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Updating Page...' : 'Publishing Page...'; }
+            if (typeof NProgress !== 'undefined') NProgress.start();
+
+            const now = new Date().toISOString();
+            const pageData = {
+                id: pageId,
+                title,
+                displayTitle: title,
+                visibility,
+                description: desc,
+                linkvertise: { enabled: lvEnabled, url: lvUrl, verificationEndpoint: lvEndpoint },
+                scripts: scripts.map(script => ({
+                    id: script.id,
+                    name: script.name,
+                    filename: `${script.id}.lua`,
+                    size: script.code.length,
+                    created: oldPage?.scripts?.find(item => item.id === script.oldId)?.created || now,
+                    updated: now
+                })),
+                created: oldPage?.created || now,
+                updated: now
+            };
+
+            await this.createPageFiles(pageData, scripts, isEditing ? { ...oldPage, id: oldPageId } : null);
+            if (isEditing && this.currentEditingPageTitle !== title) delete this.db.pages[this.currentEditingPageTitle];
+            this.db.pages[title] = pageData;
+            this.normalizeDatabase();
+            try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (storageError) { console.warn('Could not persist local database cache:', storageError); }
+            await this.persistDatabase(`${isEditing ? 'Update' : 'Add'} page: ${title}`);
+
+            this.currentEditingPageTitle = title;
             this.originalTitle = title;
-            this.originalScriptId = newScriptId;
-            
-            document.getElementById('editor-heading').textContent = `Edit: ${title}`;
-            saveBtn.textContent = 'Update Script';
+            this.originalPageId = pageId;
+            this.showToast(`${isEditing ? 'Updated' : 'Published'} page successfully!`, 'success');
             this.renderList();
             this.renderAdminList();
-            
-        } catch(e) {
-            this.showToast(`Error: ${e.message}`, 'error');
+            if (document.getElementById('page-editor-status')) document.getElementById('page-editor-status').textContent = 'Saved';
+            if (document.getElementById('editor-heading')) document.getElementById('editor-heading').textContent = `Edit: ${title}`;
+            if (saveBtn) saveBtn.textContent = 'Update Page';
+        } catch (error) {
+            console.error('Page save error:', error);
+            this.showToast(`Error: ${error.message}`, 'error');
         } finally {
-            saveBtn.disabled = false;
-            saveBtn.textContent = originalBtnText;
+            if (saveBtn) saveBtn.disabled = false;
             this.actionInProgress = false;
             if (typeof NProgress !== 'undefined') NProgress.done();
         }
     },
 
-    async createScriptFiles(scriptId, filename, code, isEditing, oldScriptId = null) {
-        const scriptDir = `scripts/${scriptId}`;
-        const rawDir = `${scriptDir}/raw`;
-        const indexPath = `${scriptDir}/index.html`;
-        const rawFilePath = `${rawDir}/${filename}`;
-        
-        const now = new Date();
-        const formattedDate = now.toLocaleDateString('en-US', {
-            month: '2-digit', day: '2-digit', year: 'numeric'
+    async createPageFiles(page, scripts, oldPage = null) {
+        const oldScripts = oldPage?.scripts || [];
+        const oldPageId = oldPage?.id || null;
+
+        if (oldPageId && oldPageId === page.id) {
+            const currentFiles = new Set((page.scripts || []).map(script => script.filename));
+            for (const oldScript of oldScripts) {
+                if (!currentFiles.has(oldScript.filename)) {
+                    await this.deleteRemoteFile(`pages/${page.id}/raw/${oldScript.filename}`);
+                }
+            }
+        }
+
+        for (const script of scripts) {
+            await this.createOrUpdateFile(`pages/${page.id}/raw/${script.id}.lua`, script.code, 'text/plain');
+        }
+        await this.createOrUpdateFile(`pages/${page.id}/index.html`, this.generatePageViewerHTML(page), 'text/html');
+
+        if (oldPageId && oldPageId !== page.id) {
+            await this.deletePageFiles(oldPageId, oldScripts);
+        }
+    },
+
+    async deleteRemoteFile(path) {
+        const url = `https://api.github.com/repos/${CONFIG.repoOwner}/${CONFIG.repo}/contents/${path}`;
+        const res = await fetch(url, { headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2026-03-10' } });
+        if (res.status === 404) return;
+        if (!res.ok) throw new Error(`Cannot read ${path} — HTTP ${res.status}`);
+        const file = await res.json();
+        const del = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${this.token}`, 'Accept': 'application/vnd.github+json', 'Content-Type': 'application/json', 'X-GitHub-Api-Version': '2026-03-10' }, body: JSON.stringify({ message: `Delete file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
+        if (!del.ok) throw new Error(`Cannot delete ${path} — HTTP ${del.status}`);
+    },
+
+    safeJsonForScript(value) {
+        return JSON.stringify(value).replace(/</g, '\\u003c').replace(/>/g, '\\u003e').replace(/&/g, '\\u0026');
+    },
+
+    generatePageViewerHTML(page) {
+        const escapedTitle = utils.escapeHtml(page.title);
+        const manifest = this.safeJsonForScript((page.scripts || []).map(script => ({ id: script.id, name: script.name, filename: script.filename })));
+        const lvConfig = this.safeJsonForScript({
+            enabled: !!page?.linkvertise?.enabled,
+            url: page?.linkvertise?.url || '',
+            verificationEndpoint: page?.linkvertise?.verificationEndpoint || ''
         });
-        
-        const escapedScriptId = utils.escapeHtml(scriptId);
-        
-        const scriptViewerHTML = `<!DOCTYPE html>
-<html lang="en">
+        const pageIdJson = this.safeJsonForScript(page.id);
+        const ownerJson = this.safeJsonForScript(CONFIG.ownerLogin);
+        const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
+        const created = new Date(page.created || Date.now()).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+        return `<!DOCTYPE html>
+<html lang="id">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${escapedScriptId} - CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/png" href="../../assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="../../style.css">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>${escapedTitle} - CihuyAkz Studio Lite</title>
+    <link rel="icon" type="image/png" href="../../assets/favicon.ico">
+    <link rel="stylesheet" href="../../style.css?v=20260925-page-builder">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body>
+<body class="script-page-body">
     <nav class="navbar">
         <div class="nav-content">
             <div class="nav-left">
-                <a href="../../index.html" class="brand" style="text-decoration: none; color: inherit;">
+                <a href="../../index.html" class="brand" style="text-decoration:none;color:inherit;">
                     <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
-                    <span class="nav-title" style="color:#ffffff;">CihuyAkz Studio Lite</span>
+                    <span class="nav-title">CihuyAkz Studio Lite</span>
                 </a>
             </div>
             <div class="nav-right">
@@ -1382,81 +1624,208 @@ const app = {
             </div>
         </div>
     </nav>
-    
-    <div class="container">
-        <div class="script-header-lg">
-            <div>
-                <h1>${escapedScriptId}</h1>
-                <div class="meta-row">
-                    <span class="meta-badge">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                        <span>${formattedDate}</span>
-                    </span>
-                </div>
-            </div>
-        </div>
 
-        <div class="code-box">
-            <div class="toolbar">
-                <div class="file-info">raw/${filename}</div>
-                <div class="toolbar-right">
-                    <button class="btn btn-sm" onclick="downloadScript()">Download</button>
-                    <button class="btn btn-sm" onclick="copyScript(this)">Copy</button>
-                    <a href="raw/${filename}" class="btn btn-secondary btn-sm" target="_blank">Raw</a>
+    <main class="container script-page-container">
+        <section id="script-content" class="script-page-content" aria-hidden="true">
+            <div class="script-header-lg page-hero-header">
+                <div>
+                    <span class="page-kicker">SCRIPT PAGE</span>
+                    <h1>${escapedTitle}</h1>
+                    <div class="meta-row">
+                        <span class="meta-badge">${(page.scripts || []).length} scripts</span>
+                        <span class="meta-badge">Updated ${created}</span>
+                        ${page?.linkvertise?.enabled ? '<span class="meta-badge meta-badge-security">Linkvertise Protected</span>' : ''}
+                    </div>
                 </div>
             </div>
-            <pre><code id="code-display" class="language-lua">Loading...</code></pre>
-        </div>
-    </div>
+            ${description}
+            <div id="page-script-tabs" class="page-script-tabs"></div>
+            <div id="page-script-panels" class="page-script-panels"></div>
+        </section>
+
+        <section id="lv-gate" class="access-gate" aria-live="polite">
+            <div class="access-gate-glow"></div>
+            <div class="access-card">
+                <div class="access-icon"><svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 3l8 4v5c0 4.5-3.2 7.9-8 9-4.8-1.1-8-4.5-8-9V7z"></path><path d="M9 12l2 2 4-4"></path></svg></div>
+                <span class="page-kicker">ACCESS CHECK</span>
+                <h1>Verify with Linkvertise</h1>
+                <p>Lengkapi langkah Linkvertise terlebih dahulu untuk membuka semua script di page ini.</p>
+                <button id="lv-start-btn" class="btn btn-full" type="button">Continue with Linkvertise</button>
+                <button id="lv-verify-btn" class="btn btn-secondary btn-full" type="button">Saya sudah kembali — Verify</button>
+                <a class="gate-back-link" href="../../index.html">← Kembali ke library</a>
+                <div id="lv-status" class="gate-status"></div>
+            </div>
+        </section>
+    </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
     <script>
-        const filename = '${filename}';
-        const scriptId = '${scriptId}';
-        
-        async function loadScript() {
+        const PAGE_ID = ${pageIdJson};
+        const OWNER_LOGIN = ${ownerJson};
+        const SCRIPTS = ${manifest};
+        const LV = ${lvConfig};
+
+        const gate = document.getElementById('lv-gate');
+        const content = document.getElementById('script-content');
+        const statusEl = document.getElementById('lv-status');
+        const verifyBtn = document.getElementById('lv-verify-btn');
+        const startBtn = document.getElementById('lv-start-btn');
+
+        function setStatus(message, type) {
+            statusEl.textContent = message || '';
+            statusEl.className = 'gate-status' + (type ? ' ' + type : '');
+        }
+
+        function isOwnerSession() {
             try {
-                const res = await fetch(\`raw/\${filename}\`);
-                const code = await res.text();
-                document.getElementById('code-display').textContent = code;
-                Prism.highlightAll();
-            } catch(e) {
-                document.getElementById('code-display').textContent = '-- Error loading source';
+                const token = localStorage.getItem('gh_token');
+                const expiry = Number(localStorage.getItem('gh_token_expiry') || 0);
+                const user = JSON.parse(localStorage.getItem('gh_user') || 'null');
+                return !!token && expiry > Date.now() && user?.login?.toLowerCase() === OWNER_LOGIN.toLowerCase();
+            } catch (_) {
+                return false;
             }
         }
-        
-        function copyScript(btn) {
-            const code = document.getElementById('code-display').textContent;
-            navigator.clipboard.writeText(code).then(() => {
-                const original = btn.innerText;
-                btn.innerText = 'Copied!';
-                setTimeout(() => btn.innerText = original, 2000);
-            });
+
+        function getHash() {
+            try { return new URLSearchParams(window.location.search).get('hash') || ''; } catch (_) { return ''; }
         }
-        
-        function downloadScript() {
-            const code = document.getElementById('code-display').textContent;
-            const element = document.createElement('a');
-            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(code));
-            element.setAttribute('download', filename);
-            element.style.display = 'none';
-            document.body.appendChild(element);
-            element.click();
-            document.body.removeChild(element);
+
+        let pageRendered = false;
+        function unlock() {
+            if (!pageRendered) {
+                pageRendered = true;
+                renderScripts();
+            }
+            gate.hidden = true;
+            content.setAttribute('aria-hidden', 'false');
+            if (history.replaceState && getHash()) history.replaceState({}, document.title, window.location.pathname);
         }
-        
-        loadScript();
+
+        function renderScripts() {
+            const tabs = document.getElementById('page-script-tabs');
+            const panels = document.getElementById('page-script-panels');
+            tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
+            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Copy</button><button class="btn btn-sm" type="button" data-download="' + index + '">Download</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Loading...</code></pre></div></section>').join('');
+            tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
+                const index = Number(tab.dataset.index);
+                tabs.querySelectorAll('.page-script-tab').forEach(item => item.classList.toggle('active', Number(item.dataset.index) === index));
+                panels.querySelectorAll('.page-script-panel').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.panel) === index));
+            }));
+            tabs.querySelectorAll('[data-copy]').forEach(btn => btn.addEventListener('click', () => copyScript(Number(btn.dataset.copy), btn)));
+            tabs.querySelectorAll('[data-download]').forEach(btn => btn.addEventListener('click', () => downloadScript(Number(btn.dataset.download))));
+            loadScriptSources();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text == null ? '' : String(text);
+            return div.innerHTML;
+        }
+
+        const sourceCache = {};
+        async function loadScriptSources() {
+            await Promise.all(SCRIPTS.map(async (script, index) => {
+                try {
+                    const response = await fetch('raw/' + encodeURIComponent(script.filename), { cache: 'no-store' });
+                    if (!response.ok) throw new Error('HTTP ' + response.status);
+                    const code = await response.text();
+                    sourceCache[index] = code;
+                    const block = document.getElementById('code-' + index);
+                    if (block) {
+                        block.textContent = code;
+                        Prism.highlightElement(block);
+                    }
+                } catch (_) {
+                    const block = document.getElementById('code-' + index);
+                    if (block) block.textContent = '-- Error loading source';
+                }
+            }));
+        }
+
+        async function copyScript(index, btn) {
+            try {
+                const code = sourceCache[index] || '';
+                await navigator.clipboard.writeText(code);
+                const original = btn.textContent;
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = original, 1600);
+            } catch (_) {}
+        }
+
+        function downloadScript(index) {
+            const script = SCRIPTS[index];
+            const code = sourceCache[index] || '';
+            const blobUrl = URL.createObjectURL(new Blob([code], { type: 'text/plain;charset=utf-8' }));
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = script.filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+        }
+
+        async function verifyLinkvertise() {
+            const hash = getHash();
+            if (!LV.verificationEndpoint) {
+                setStatus('Verification endpoint belum dikonfigurasi oleh Owner.', 'error');
+                return;
+            }
+            if (!/^[a-f0-9]{64}$/i.test(hash)) {
+                setStatus('Hash verifikasi Linkvertise tidak ditemukan. Selesaikan Linkvertise lalu kembali ke page ini.', 'error');
+                return;
+            }
+            verifyBtn.disabled = true;
+            startBtn.disabled = true;
+            setStatus('Memverifikasi akses...', 'loading');
+            try {
+                const endpoint = new URL(LV.verificationEndpoint);
+                endpoint.searchParams.set('hash', hash);
+                endpoint.searchParams.set('page', PAGE_ID);
+                const response = await fetch(endpoint.toString(), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+                    body: JSON.stringify({ hash })
+                });
+                const text = await response.text();
+                let verified = false;
+                try {
+                    const parsed = JSON.parse(text);
+                    verified = parsed?.verified === true || parsed?.success === true;
+                } catch (_) {
+                    verified = text.trim().toUpperCase() === 'TRUE';
+                }
+                if (!response.ok || !verified) throw new Error('Hash tidak valid atau sudah digunakan.');
+                setStatus('Verifikasi berhasil.', 'success');
+                unlock();
+            } catch (error) {
+                setStatus(error.message || 'Verifikasi gagal. Coba ulangi dari Linkvertise.', 'error');
+                verifyBtn.disabled = false;
+                startBtn.disabled = false;
+            }
+        }
+
+        startBtn.addEventListener('click', () => {
+            if (!LV.url) {
+                setStatus('Linkvertise URL belum dikonfigurasi.', 'error');
+                return;
+            }
+            window.location.href = LV.url;
+        });
+        verifyBtn.addEventListener('click', verifyLinkvertise);
+
+        if (isOwnerSession() || !LV.enabled) {
+            unlock();
+        } else if (getHash()) {
+            verifyLinkvertise();
+        } else {
+            setStatus('Akses dilindungi Linkvertise.');
+        }
     </script>
 </body>
 </html>`;
-        
-        if (isEditing && oldScriptId && oldScriptId !== scriptId) {
-            await this.deleteScriptFiles(oldScriptId, filename);
-        }
-        
-        await this.createOrUpdateFile(indexPath, scriptViewerHTML, 'text/html');
-        await this.createOrUpdateFile(rawFilePath, code, 'text/plain');
     },
 
     async createOrUpdateFile(path, content, contentType) {

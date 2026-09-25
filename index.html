@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-red-v3">
+    <link rel="stylesheet" href="style.css?v=20260925-red-v4">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -146,20 +146,20 @@
                 <div class="admin-header-flex">
                     <h2>Admin Panel</h2>
                     <div class="tab-switcher">
-                        <button class="tab-btn active" onclick="app.switchAdminTab('list')">
+                        <button class="tab-btn active" data-admin-tab="list" onclick="app.switchAdminTab('list')">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
                             </svg>
                             Manage
                         </button>
-                        <button class="tab-btn" onclick="app.switchAdminTab('create')">
+                        <button class="tab-btn" data-admin-tab="create" onclick="app.switchAdminTab('create')">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <line x1="12" y1="5" x2="12" y2="19"></line>
                                 <line x1="5" y1="12" x2="19" y2="12"></line>
                             </svg>
                             Add New
                         </button>
-                        <button class="tab-btn" onclick="app.switchAdminTab('bots')">
+                        <button class="tab-btn" data-admin-tab="bots" onclick="app.switchAdminTab('bots')">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <path d="M12 8v4l3 3"></path>
@@ -170,48 +170,133 @@
                 </div>
 
                 <div id="admin-tab-editor" class="admin-tab" style="display:none">
-                    <div class="editor-container">
-                        <h3 id="editor-heading">Create New Script</h3>
-                        <div class="form-row">
-                            <div class="form-group form-group-flex">
-                                <label>Script Title</label>
-                                <input type="text" id="edit-title" class="input-field" placeholder="e.g. Advanced NPC System">
+                    <div class="editor-container page-editor-shell">
+                        <div class="editor-title-row">
+                            <div>
+                                <div class="eyebrow">PAGE BUILDER</div>
+                                <h3 id="editor-heading">Create New Page</h3>
+                                <p class="editor-subtitle">Buat satu halaman yang bisa berisi banyak script Lua.</p>
+                            </div>
+                            <span class="editor-status" id="page-editor-status">Draft</span>
+                        </div>
+
+                        <div class="page-settings-card">
+                            <div class="section-heading">
+                                <div>
+                                    <h4>Informasi Page</h4>
+                                    <p>Judul page tampil sebagai nama utama di library.</p>
+                                </div>
+                                <span class="section-number">01</span>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group form-group-flex">
+                                    <label>Judul Page</label>
+                                    <input type="text" id="edit-title" class="input-field" placeholder="e.g. Ultimate Tools Pack">
+                                </div>
+                                <div class="form-group">
+                                    <label>Visibility</label>
+                                    <select id="edit-visibility" class="input-field">
+                                        <option value="PUBLIC">Public</option>
+                                        <option value="PRIVATE">Private</option>
+                                        <option value="UNLISTED">Unlisted</option>
+                                    </select>
+                                </div>
                             </div>
                             <div class="form-group">
-                                <label>Visibility</label>
-                                <select id="edit-visibility" class="input-field">
-                                    <option value="PUBLIC">Public</option>
-                                    <option value="PRIVATE">Private</option>
-                                    <option value="UNLISTED">Unlisted</option>
-                                </select>
-                            </div>
-                        </div>
-                        
-                        <div class="form-row">
-                            <div class="form-group form-group-flex">
                                 <label>Description</label>
-                                <textarea id="edit-desc" class="input-field" rows="4" placeholder="Briefly describe your script..."></textarea>
+                                <textarea id="edit-desc" class="input-field" rows="4" placeholder="Deskripsi singkat untuk page ini..."></textarea>
                             </div>
                         </div>
-    
-                        <div class="form-group">
-                            <label>Lua Source</label>
-                            <textarea id="edit-code" class="input-field code-textarea"></textarea>
+
+                        <div class="page-settings-card linkvertise-settings-card">
+                            <div class="section-heading">
+                                <div>
+                                    <h4>Linkvertise Protection</h4>
+                                    <p>Pengunjung harus melewati Linkvertise sebelum melihat semua script di page.</p>
+                                </div>
+                                <label class="switch" title="Aktifkan Linkvertise">
+                                    <input type="checkbox" id="edit-lv-enabled" onchange="app.updateLinkvertiseFields()">
+                                    <span class="switch-track"></span>
+                                </label>
+                            </div>
+                            <div id="linkvertise-fields" class="linkvertise-fields is-disabled">
+                                <div class="form-group">
+                                    <label>Linkvertise URL</label>
+                                    <input type="url" id="edit-lv-url" class="input-field" placeholder="https://linkvertise.com/..." autocomplete="off">
+                                </div>
+                                <div class="form-group">
+                                    <label>Verification Endpoint</label>
+                                    <input type="url" id="edit-lv-endpoint" class="input-field" placeholder="https://your-worker.example.workers.dev" autocomplete="off">
+                                    <p class="field-help">Endpoint ini melakukan verifikasi hash anti-bypass di server. Token Linkvertise jangan ditaruh di frontend.</p>
+                                </div>
+                            </div>
                         </div>
-    
+
+                        <div class="scripts-builder-card">
+                            <div class="section-heading scripts-section-heading">
+                                <div>
+                                    <h4>Scripts di dalam Page</h4>
+                                    <p>Setiap item punya <strong>Script Name</strong> sendiri. Tambahkan sebanyak yang diperlukan.</p>
+                                </div>
+                                <button class="btn btn-secondary btn-sm" onclick="app.addScriptEditor()">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                    Tambah Script
+                                </button>
+                            </div>
+                            <div id="script-editor-list" class="script-editor-list"></div>
+                        </div>
+
                         <div class="editor-actions">
+                            <div class="action-note">
+                                <span class="dot"></span>
+                                <span id="script-editor-count">0 script</span>
+                            </div>
                             <div class="action-buttons">
                                 <button class="btn btn-secondary" onclick="app.switchAdminTab('list')">Cancel</button>
-                                <button class="btn" onclick="app.saveScript()">Publish</button>
+                                <button class="btn" onclick="app.savePage()">Publish Page</button>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <div id="admin-tab-list" class="admin-tab" style="display:block">
+                    <div class="admin-dashboard-head">
+                        <div>
+                            <div class="eyebrow">CONTENT CONTROL</div>
+                            <h3>Pages & Scripts</h3>
+                            <p>Kelola semua page dan script dari satu tempat.</p>
+                        </div>
+                        <button class="btn" onclick="app.switchAdminTab('create')">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="19"></line></svg>
+                            New Page
+                        </button>
+                    </div>
+                    <div class="admin-stats-grid">
+                        <div class="stat-card stat-card-accent">
+                            <span class="stat-label">PAGES</span>
+                            <strong id="pages-count">0</strong>
+                            <span class="stat-hint">Published pages</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">SCRIPTS</span>
+                            <strong id="scripts-count">0</strong>
+                            <span class="stat-hint">Total script items</span>
+                        </div>
+                        <div class="stat-card">
+                            <span class="stat-label">PROTECTED</span>
+                            <strong id="protected-count">0</strong>
+                            <span class="stat-hint">Linkvertise pages</span>
+                        </div>
+                    </div>
                     <div class="admin-list-header">
-                        <h3>Existing Scripts</h3>
-                        <span id="total-stats">Loading...</span>
+                        <div>
+                            <h3>Existing Pages</h3>
+                            <span id="total-stats">Loading...</span>
+                        </div>
+                        <div class="admin-list-search">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
+                            <input id="admin-page-search" type="search" placeholder="Search pages..." oninput="app.setAdminSearch(this.value)">
+                        </div>
                     </div>
                     <div id="admin-list"></div>
                 </div>
@@ -284,6 +369,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260924-red"></script>
+    <script src="app.js?v=20260925-page-builder"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>
