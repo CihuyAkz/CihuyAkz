@@ -1,4 +1,35 @@
 {
-  "pages": {},
+  "pages": {
+    "advanced-ban-hammer": {
+      "id": "advanced-ban-hammer",
+      "title": "[Advanced]Ban Hammer",
+      "displayTitle": "[Advanced]Ban Hammer",
+      "visibility": "PUBLIC",
+      "description": "A Ban Hammer,Nothing Special But Cooler Ban Animation",
+      "created": "2026-09-25T13:26:11.367Z",
+      "updated": "2026-09-25T13:26:11.371Z",
+      "scripts": {
+        "local-script": {
+          "id": "local-script",
+          "name": "Local Script",
+          "displayName": "Local Script",
+          "filename": "local-script.lua",
+          "size": 24290,
+          "created": "2026-09-25T13:26:11.371Z",
+          "updated": "2026-09-25T13:26:11.371Z"
+        },
+        "serverscript": {
+          "id": "serverscript",
+          "name": "ServerScript",
+          "displayName": "ServerScript",
+          "filename": "serverscript.lua",
+          "size": 10388,
+          "created": "2026-09-25T13:26:11.371Z",
+          "updated": "2026-09-25T13:26:11.371Z"
+        }
+      },
+      "filename": "index.html"
+    }
+  },
   "bots": {}
 }
