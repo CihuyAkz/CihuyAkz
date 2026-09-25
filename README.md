@@ -1,18 +1,17 @@
 # CihuyAkz Studio Lite
 
-Panel admin untuk mengelola Page, banyak script Lua dalam satu Page, pustaka potongan Lua, dan bot Discord.
+A GitHub-backed admin panel for managing Pages, multiple Lua scripts per Page, reusable Lua snippets, and Discord bots.
 
-## Perubahan versi ini
-- Tombol **Terbitkan Page** diperbaiki. Fungsi pengumpulan isi editor yang hilang sudah ditambahkan.
-- Semua akses GitHub sebelum publish dicek ulang dengan SHA database terbaru agar konflik data browser tidak mudah membuat publish gagal.
-- Pesan error penting menggunakan Bahasa Indonesia.
-- UI Admin Panel didesain ulang menjadi dashboard + navigasi samping.
-- Satu Page dapat berisi banyak **Nama Script**.
-- Nama script dibuat memiliki ID/file unik sehingga script dengan nama mirip tidak saling menimpa.
-- **Pustaka Lua** untuk menyimpan potongan kode yang sering dipakai.
-- Tombol **Sisipkan Lua** tersedia di setiap editor script untuk memasukkan potongan langsung ke posisi kursor.
-- Linkvertise tidak digunakan.
-- Notifikasi Toast dapat ditutup dengan sentuhan/klik.
+## Current version
+- Publishing uses the Page Builder and supports multiple Script Names per Page.
+- Generated script IDs and filenames are unique, so scripts do not overwrite each other.
+- The Lua Library stores reusable snippets that can be inserted directly into any script editor.
+- Toast notifications can be dismissed by tapping/clicking them.
+- Linkvertise is not used.
+- The public site and admin interface use English UI text.
+- Generated Page links automatically follow the active GitHub Pages repository path to avoid project-site 404 errors caused by hard-coded repository URLs.
 
-## Publish
-Login menggunakan token GitHub yang memiliki izin **Contents: Read and write** pada repository target. Repository dan branch diatur di `app.js` pada objek `CONFIG`.
+## Publishing
+Sign in with a GitHub token that has **Contents: Read and write** permission for the target repository. The branch is `main`.
+
+The repository owner, repository name, and GitHub Pages base URL are detected from the active GitHub Pages address when possible. Fallback values are defined in `app.js` for non-GitHub-Pages use.

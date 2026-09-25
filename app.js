@@ -1,15 +1,30 @@
 const CONFIG = {
-    // GitHub repository used for publishing. Only this GitHub account may log in.
-    repoOwner: 'CihuyAkz',
-    repo: 'CihuyAkz',
+    // Fallback repository values used outside a GitHub Pages project site.
+    fallbackRepoOwner: 'CihuyAkz',
+    fallbackRepo: 'CihuyAkz',
     allowedUser: 'CihuyAkz',
     ownerLogin: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
 
-    // GitHub Pages URL for this project fork.
+    // Detect the active GitHub Pages project path at runtime.
+    // This prevents generated page links from pointing at the wrong repository.
+    get repoOwner() {
+        const host = (location.hostname || '').toLowerCase();
+        const match = host.match(/^([^.]*)\.github\.io$/);
+        return match?.[1] || this.fallbackRepoOwner;
+    },
+    get repo() {
+        const host = (location.hostname || '').toLowerCase();
+        const isGithubPages = /^([^.]*)\.github\.io$/.test(host);
+        const parts = (location.pathname || '').split('/').filter(Boolean);
+        return isGithubPages && parts[0] ? decodeURIComponent(parts[0]) : this.fallbackRepo;
+    },
     pagesBaseUrl() {
-        return `https://${this.repoOwner.toLowerCase()}.github.io/${this.repo}/`;
+        return `https://${this.repoOwner}.github.io/${encodeURIComponent(this.repo)}/`;
+    },
+    pageUrl(path) {
+        return new URL(path.replace(/^\/+/, ''), this.pagesBaseUrl()).href;
     }
 };
 
@@ -53,26 +68,26 @@ const utils = {
     },
 
     validateTitle(title) {
-        if (!title || title.trim().length === 0) return 'Judul wajib diisi.';
-        if (title.length > 100) return 'Judul maksimal 100 karakter.';
+        if (!title || title.trim().length === 0) return 'Title is required.';
+        if (title.length > 100) return 'Title can contain up to 100 characters.';
         const sanitized = this.sanitizeTitle(title);
         if (sanitized.includes('..') || sanitized.includes('/') || sanitized.includes('\\')) {
-            return 'Karakter judul tidak valid.';
+            return 'The title contains invalid characters.';
         }
         const reserved = ['con', 'prn', 'aux', 'nul'];
-        if (reserved.includes(sanitized.toLowerCase())) return 'Judul tidak valid.';
+        if (reserved.includes(sanitized.toLowerCase())) return 'Invalid title.';
         return null;
     },
 
     validateCode(code) {
-        if (!code || code.trim().length === 0) return 'Kode Lua wajib diisi.';
-        if (code.length > 100000) return 'Kode Lua terlalu besar (maksimal 100 KB).';
+        if (!code || code.trim().length === 0) return 'Lua code is required.';
+        if (code.length > 100000) return 'Lua code is too large (maximum 100 KB).';
         return null;
     },
     
     formatDisplayTime(isoString, timezone) {
         const date = new Date(isoString);
-        return date.toLocaleString('id-ID', {
+        return date.toLocaleString('en-US', {
             timeZone: timezone,
             weekday: 'short',
             year: 'numeric',
@@ -253,7 +268,7 @@ const app = {
                 localStorage.setItem('gh_token_expiry', expiry.toString());
             } catch(e) {
                 console.error('Session save error:', e);
-                this.showToast('Sesi gagal disimpan.', 'error');
+                this.showToast('Failed to save session.', 'error');
             }
         }
     },
@@ -274,7 +289,7 @@ const app = {
         try {
             const token = document.getElementById('auth-token').value.trim();
             if (!token) {
-                this.showLoginError('Token GitHub wajib diisi.');
+                this.showLoginError('GitHub token is required.');
                 return;
             }
             
@@ -286,7 +301,7 @@ const app = {
                 document.getElementById('auth-token').value = '';
                 await this.loadDatabase();
                 this.renderList();
-                this.showToast('Berhasil masuk.', 'success');
+                this.showToast('Signed in successfully.', 'success');
             }
         } finally {
             this.actionInProgress = false;
@@ -332,7 +347,7 @@ const app = {
     },
 
     logout(silent = false) {
-        if (!silent && !confirm('Yakin ingin keluar dari akun?')) {
+        if (!silent && !confirm('Are you sure you want to sign out?')) {
             return;
         }
         
@@ -360,7 +375,7 @@ const app = {
         location.href = '#';
         
         if (!silent) {
-            this.showToast('Berhasil keluar.', 'success');
+            this.showToast('Signed out successfully.', 'success');
             setTimeout(() => location.reload(), 1000);
         }
     },
@@ -371,11 +386,11 @@ const app = {
                 headers: { 'Authorization': `token ${this.token}` }
             });
             
-            if (!res.ok) throw new Error('Token GitHub tidak valid atau sudah kedaluwarsa.');
+            if (!res.ok) throw new Error('The GitHub token is invalid or expired.');
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
-                throw new Error(`Akses hanya untuk akun GitHub ${CONFIG.allowedUser}. Token ini milik ${user.login}.`);
+                throw new Error(`Access is restricted to the GitHub account ${CONFIG.allowedUser}. This token belongs to ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -398,7 +413,7 @@ const app = {
             this.isLoading = true;
             const list = document.getElementById('admin-list');
             if (list) {
-                list.innerHTML = `<div style="text-align:center;padding:20px"><div class="spinner"></div><p>Memuat...</p></div>`;
+                list.innerHTML = `<div style="text-align:center;padding:20px"><div class="spinner"></div><p>Loading...</p></div>`;
             }
 
             // Public/library view is intentionally local-first. The original project
@@ -417,7 +432,7 @@ const app = {
                 cache: 'no-store',
                 headers: { 'Cache-Control': 'no-cache' }
             });
-            if (!localRes.ok) throw new Error(`Gagal memuat database bawaan (HTTP ${localRes.status}).`);
+            if (!localRes.ok) throw new Error(`Failed to load the bundled database (HTTP ${localRes.status}).`);
 
             this.db = await localRes.json();
             this.normalizeDatabase();
@@ -442,11 +457,11 @@ const app = {
             const list = document.getElementById('admin-list');
             if (list) {
                 list.innerHTML = `<div class="empty-admin-state">
-                    <p style="color:var(--color-danger)">Terjadi kesalahan: ${e.message}</p>
-                    <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Coba Lagi</button>
+                    <p style="color:var(--color-danger)">An error occurred: ${e.message}</p>
+                    <button class="btn btn-sm" onclick="app.loadDatabase()" style="margin-top:10px">Retry</button>
                 </div>`;
             }
-            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
+            this.showToast(`An error occurred: ${e.message}`, 'error');
         } finally {
             this.isLoading = false;
         }
@@ -623,7 +638,7 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Bot dipicu. Memeriksa GitHub...', 'success');
+                    this.showToast('Bot triggered. Checking GitHub...', 'success');
                     return true;
                 }
             } else {
@@ -654,7 +669,7 @@ const app = {
         const timezone = timezoneInput ? timezoneInput.value : Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         if (!title || !message) {
-            this.showToast('Judul dan pesan wajib diisi.', 'error');
+            this.showToast('Title and message are required.', 'error');
             return;
         }
         
@@ -671,7 +686,7 @@ const app = {
             if (schedule && scheduleTime) {
                 const localDate = new Date(scheduleTime);
                 if (localDate < new Date()) {
-                    this.showToast('Waktu tidak boleh berada di masa lalu.', 'error');
+                    this.showToast('The scheduled time cannot be in the past.', 'error');
                     this.actionInProgress = false;
                     saveBtn.disabled = false;
                     return;
@@ -709,20 +724,20 @@ const app = {
                 })
             });
 
-            if (!dbRes.ok) throw new Error('Gagal memperbarui database.');
+            if (!dbRes.ok) throw new Error('Failed to update the database.');
 
             const newDbData = await dbRes.json();
             this.dbSha = newDbData.content.sha;
 
             if (schedule) {
-                this.showToast('Jadwal berhasil disimpan.', 'success');
+                this.showToast('Schedule saved successfully.', 'success');
                 await this.loadDatabase();
             } else {
                 await this.sendBotNow(botId);
             }
 
         } catch(e) {
-            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
+            this.showToast(`An error occurred: ${e.message}`, 'error');
         } finally {
             saveBtn.disabled = false;
             this.actionInProgress = false;
@@ -742,8 +757,8 @@ const app = {
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-state">
                 <div class="empty-state-icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                <h2>Page tidak ditemukan</h2>
-                <p>Coba ubah pencarian atau filter yang digunakan.</p>
+                <h2>No pages found</h2>
+                <p>Try adjusting your search or filter</p>
             </div>`;
             return;
         }
@@ -752,8 +767,8 @@ const app = {
             const pageId = page.id || utils.sanitizeTitle(page.title);
             const scriptsCount = Array.isArray(page.scripts) ? page.scripts.length : 0;
             const scriptNames = (page.scripts || []).slice(0, 3).map(script => utils.escapeHtml(script.name || '')).join(' · ');
-            const pagePath = `${CONFIG.pagesBaseUrl()}?page=${encodeURIComponent(pageId)}`;
-            return `<article class="script-card page-card" onclick="window.location.href='${pagePath}'">
+            const pagePath = CONFIG.pageUrl(page.legacy ? `scripts/${encodeURIComponent(pageId)}/` : `pages/${encodeURIComponent(pageId)}/`);
+            return `<article class="script-card page-card" onclick="window.location.assign('${pagePath}')">
                 <div class="card-glow"></div>
                 <div class="card-content">
                     <div class="card-header-section">
@@ -764,10 +779,10 @@ const app = {
                         ${page.visibility !== 'PUBLIC' ? `<span class="badge badge-${page.visibility.toLowerCase()}">${page.visibility}</span>` : ''}
                     </div>
                     ${page.description ? `<p class="page-description">${utils.escapeHtml(page.description.substring(0, 170))}${page.description.length > 170 ? '...' : ''}</p>` : ''}
-                    <div class="page-script-preview">${scriptNames || 'Belum ada script.'}</div>
+                    <div class="page-script-preview">${scriptNames || 'No scripts yet.'}</div>
                     <div class="card-meta">
-                        <span>${scriptsCount} script</span>
-                        <span class="page-open">Buka <span>→</span></span>
+                        <span>${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
+                        <span class="page-open">Open <span>→</span></span>
                     </div>
                 </div>
             </article>`;
@@ -890,23 +905,23 @@ const app = {
     async deletePageConfirmation(title) {
         const page = this.db?.pages?.[title];
         if (!page || this.actionInProgress) {
-            this.showToast('Page tidak ditemukan.', 'error');
+            this.showToast('Page not found.', 'error');
             return;
         }
         let confirmed = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Hapus page?',
-                text: `“${page.title}” dan semua script di dalamnya akan dihapus.`,
+                title: 'Delete page?',
+                text: `“${page.title}” and all scripts inside it will be deleted.`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Hapus Page',
-                cancelButtonText: 'Batal',
+                confirmButtonText: 'Delete Page',
+                cancelButtonText: 'Cancel',
                 confirmButtonColor: '#ef4444'
             });
             confirmed = result.isConfirmed;
         } else {
-            confirmed = confirm(`Hapus page “${page.title}”?`);
+            confirmed = confirm(`Delete page “${page.title}”?`);
         }
         if (!confirmed) return;
         this.actionInProgress = true;
@@ -914,13 +929,13 @@ const app = {
             if (typeof NProgress !== 'undefined') NProgress.start();
             await this.deletePageFiles(page.id, page.scripts || []);
             delete this.db.pages[title];
-            await this.persistDatabase(`Hapus page: ${title}`);
+            await this.persistDatabase(`Delete page: ${title}`);
             try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Page berhasil dihapus.', 'success');
+            this.showToast('Page deleted successfully.', 'success');
             await this.loadDatabase();
             this.switchAdminTab('list');
         } catch (error) {
-            this.showToast(`Gagal menghapus page: ${error.message}`, 'error');
+            this.showToast(`Failed to delete page: ${error.message}`, 'error');
         } finally {
             this.actionInProgress = false;
             if (typeof NProgress !== 'undefined') NProgress.done();
@@ -948,8 +963,8 @@ const app = {
         if (title) title.value = '';
         if (desc) desc.value = '';
         if (code) code.value = '';
-        if (heading) heading.textContent = 'Tambah Potongan Lua';
-        if (button) button.textContent = 'Simpan Potongan';
+        if (heading) heading.textContent = 'Add Lua Snippet';
+        if (button) button.textContent = 'Save Snippet';
         this.renderLuaLibrary();
     },
 
@@ -961,22 +976,22 @@ const app = {
             .filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query))
             .sort((a,b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
         if (!snippets.length) {
-            list.innerHTML = `<div class="library-empty"><div class="library-empty-icon">LUA</div><h4>${query ? 'Potongan tidak ditemukan' : 'Belum ada potongan Lua'}</h4><p>Simpan kode yang sering dipakai sekali, lalu sisipkan ke script mana pun.</p></div>`;
+            list.innerHTML = `<div class="library-empty"><div class="library-empty-icon">LUA</div><h4>${query ? 'Snippet not found' : 'No Lua snippets yet'}</h4><p>Save frequently used code once, then insert it into any script.</p></div>`;
             return;
         }
-        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Potongan Lua siap digunakan.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Ubah</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Hapus</button></div></article>`).join('');
+        list.innerHTML = snippets.map(item => `<article class="lua-snippet-item"><div class="lua-snippet-main"><div class="lua-snippet-icon">L</div><div class="lua-snippet-copy"><strong>${utils.escapeHtml(item.name)}</strong><span>${utils.escapeHtml(item.description || 'Reusable Lua snippet.')}</span></div></div><div class="lua-snippet-actions"><button class="btn btn-secondary btn-sm" type="button" onclick="app.editLuaSnippet('${encodeURIComponent(item.id)}')">Edit</button><button class="btn btn-danger-soft btn-sm" type="button" onclick="app.deleteLuaSnippet('${encodeURIComponent(item.id)}')">Delete</button></div></article>`).join('');
     },
 
     editLuaSnippet(encodedId) {
         const id = decodeURIComponent(encodedId);
         const item = this.db?.luaSnippets?.[id];
-        if (!item) return this.showToast('Potongan Lua tidak ditemukan.', 'error');
+        if (!item) return this.showToast('Lua snippet not found.', 'error');
         document.getElementById('snippet-id').value = item.id;
         document.getElementById('snippet-title').value = item.name || '';
         document.getElementById('snippet-desc').value = item.description || '';
         document.getElementById('snippet-code').value = item.code || '';
         document.getElementById('snippet-editor-heading').textContent = `Edit: ${item.name}`;
-        document.getElementById('snippet-save-btn').textContent = 'Perbarui Potongan';
+        document.getElementById('snippet-save-btn').textContent = 'Update Snippet';
         this.switchAdminTab('snippets');
         document.getElementById('snippet-title')?.focus();
     },
@@ -988,12 +1003,12 @@ const app = {
         const description = document.getElementById('snippet-desc')?.value.trim() || '';
         const code = document.getElementById('snippet-code')?.value || '';
         const existingId = idEl?.value.trim() || '';
-        if (!title) return this.showToast('Nama potongan wajib diisi.', 'error');
+        if (!title) return this.showToast('Snippet name is required.', 'error');
         const codeError = utils.validateCode(code);
         if (codeError) return this.showToast(codeError, 'error');
         this.actionInProgress = true;
         const button = document.getElementById('snippet-save-btn');
-        if (button) { button.disabled = true; button.textContent = 'Menyimpan...'; }
+        if (button) { button.disabled = true; button.textContent = 'Saving...'; }
         try {
             const base = utils.sanitizeTitle(title) || `potongan-${Date.now()}`;
             let id = existingId || base;
@@ -1001,16 +1016,16 @@ const app = {
             const now = new Date().toISOString();
             this.db.luaSnippets[id] = { id, name: title, description, code, created: this.db.luaSnippets[id]?.created || now, updated: now };
             if (existingId && existingId !== id) delete this.db.luaSnippets[existingId];
-            await this.persistDatabase(`${existingId ? 'Perbarui' : 'Tambah'} potongan Lua: ${title}`);
+            await this.persistDatabase(`${existingId ? 'Update' : 'Add'} Lua snippet: ${title}`);
             try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Potongan Lua berhasil disimpan.', 'success');
+            this.showToast('Lua snippet saved successfully.', 'success');
             this.resetSnippetEditor();
             this.renderAdminList();
         } catch (error) {
-            this.showToast(`Gagal menyimpan potongan: ${error.message}`, 'error');
+            this.showToast(`Failed to save snippet: ${error.message}`, 'error');
         } finally {
             this.actionInProgress = false;
-            if (button) { button.disabled = false; button.textContent = existingId ? 'Perbarui Potongan' : 'Simpan Potongan'; }
+            if (button) { button.disabled = false; button.textContent = existingId ? 'Update Snippet' : 'Save Snippet'; }
         }
     },
 
@@ -1020,19 +1035,19 @@ const app = {
         if (!item || this.actionInProgress) return;
         let confirmed = false;
         if (typeof Swal !== 'undefined') {
-            confirmed = (await Swal.fire({ title: 'Hapus potongan Lua?', text: `“${item.name}” akan dihapus dari pustaka.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Hapus', cancelButtonText: 'Batal', confirmButtonColor: '#ef4444' })).isConfirmed;
-        } else confirmed = confirm(`Hapus potongan “${item.name}”?`);
+            confirmed = (await Swal.fire({ title: 'Delete Lua snippet?', text: `“${item.name}” will be removed from the library.`, icon: 'warning', showCancelButton: true, confirmButtonText: 'Delete', cancelButtonText: 'Cancel', confirmButtonColor: '#ef4444' })).isConfirmed;
+        } else confirmed = confirm(`Delete snippet “${item.name}”?`);
         if (!confirmed) return;
         this.actionInProgress = true;
         try {
             delete this.db.luaSnippets[id];
-            await this.persistDatabase(`Hapus potongan Lua: ${item.name}`);
+            await this.persistDatabase(`Delete Lua snippet: ${item.name}`);
             try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-            this.showToast('Potongan Lua berhasil dihapus.', 'success');
+            this.showToast('Lua snippet deleted successfully.', 'success');
             this.resetSnippetEditor();
             this.renderAdminList();
         } catch (error) {
-            this.showToast(`Gagal menghapus potongan: ${error.message}`, 'error');
+            this.showToast(`Failed to delete snippet: ${error.message}`, 'error');
         } finally { this.actionInProgress = false; }
     },
 
@@ -1057,7 +1072,7 @@ const app = {
         if (!list) return;
         const query = (document.getElementById('insert-lua-search')?.value || '').trim().toLowerCase();
         const items = Object.values(this.db?.luaSnippets || {}).filter(x => !query || `${x.name} ${x.description || ''}`.toLowerCase().includes(query));
-        list.innerHTML = items.length ? items.map(item => `<button type="button" class="insert-lua-item" onclick="app.insertLuaSnippet('${encodeURIComponent(item.id)}')"><span class="insert-lua-item-icon">L</span><span><strong>${utils.escapeHtml(item.name)}</strong><small>${utils.escapeHtml(item.description || 'Tanpa deskripsi')}</small></span></button>`).join('') : `<div class="library-empty compact"><h4>${query ? 'Tidak ada hasil' : 'Belum ada potongan Lua'}</h4><p>Buat potongan dari tab Pustaka Lua terlebih dahulu.</p></div>`;
+        list.innerHTML = items.length ? items.map(item => `<button type="button" class="insert-lua-item" onclick="app.insertLuaSnippet('${encodeURIComponent(item.id)}')"><span class="insert-lua-item-icon">L</span><span><strong>${utils.escapeHtml(item.name)}</strong><small>${utils.escapeHtml(item.description || 'No description')}</small></span></button>`).join('') : `<div class="library-empty compact"><h4>${query ? 'No results' : 'No Lua snippets yet'}</h4><p>Create a snippet in the Lua Library first.</p></div>`;
     },
 
     insertLuaSnippet(encodedId) {
@@ -1065,12 +1080,12 @@ const app = {
         const editor = this.insertTargetEditorId ? this.pageEditors[this.insertTargetEditorId] : null;
         if (!item || !editor) {
             this.closeInsertLuaModal();
-            return this.showToast('Editor atau potongan Lua tidak ditemukan.', 'error');
+            return this.showToast('Editor or Lua snippet not found.', 'error');
         }
         editor.replaceSelection(item.code + (item.code.endsWith('\n') ? '' : '\n'));
         editor.focus();
         this.closeInsertLuaModal();
-        this.showToast(`“${item.name}” berhasil disisipkan.`, 'success');
+        this.showToast(`“${item.name}” inserted successfully.`, 'success');
     },
 
     async renderAdminList() {
@@ -1099,13 +1114,13 @@ const app = {
         if (sorted.length === 0) {
             list.innerHTML = `<div class="empty-admin-state">
                 <div class="empty-state-icon"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 7.5A2.5 2.5 0 0 1 6.5 5h4l2 2h5A2.5 2.5 0 0 1 20 9.5v7A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5z"></path></svg></div>
-                <p>${query ? 'Tidak ada page yang cocok dengan pencarian.' : 'Belum ada page. Klik “Buat Page Baru” untuk membuat page pertama.'}</p>
+                <p>${query ? 'No pages match your search.' : 'No pages yet. Click “New Page” to create your first page.'}</p>
             </div>`;
             return;
         }
 
         list.innerHTML = sorted.map(page => {
-            const updated = page.updated ? new Date(page.updated).toLocaleDateString('id-ID') : new Date(page.created).toLocaleDateString('id-ID');
+            const updated = page.updated ? new Date(page.updated).toLocaleDateString('en-US') : new Date(page.created).toLocaleDateString('en-US');
             const scriptsCount = (page.scripts || []).length;
             const pagePayload = encodeURIComponent(page.title);
             return `<div class="admin-item page-admin-item" data-page-title="${utils.escapeHtml(page.title)}" onclick="app.populateEditor(decodeURIComponent('${pagePayload}'))">
@@ -1115,13 +1130,13 @@ const app = {
                         <strong>${utils.escapeHtml(page.title)}</strong>
                         <div class="admin-meta">
                             <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
-                            <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}</span>
-                            <span class="text-muted">Diperbarui ${updated}</span>
+                            <span class="script-count-pill">${scriptsCount} script${scriptsCount === 1 ? '' : 's'}${scriptsCount === 1 ? '' : 's'}</span>
+                            <span class="text-muted">Updated ${updated}</span>
                         </div>
                     </div>
                 </div>
                 <div class="admin-item-actions">
-                    <button class="icon-btn danger" title="Hapus page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
+                    <button class="icon-btn danger" title="Delete page" onclick="event.stopPropagation(); app.deletePageConfirmation(decodeURIComponent('${pagePayload}'))">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
                     </button>
                     <span class="admin-open-icon"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></span>
@@ -1138,15 +1153,15 @@ const app = {
         const sorted = bots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
         
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-admin-state"><p>Belum ada bot. Tekan “Buat Bot” untuk menambahkan.</p></div>`;
+            list.innerHTML = `<div class="empty-admin-state"><p>No bots yet. Click “New Bot” to add one.</p></div>`;
             return;
         }
         
         list.innerHTML = sorted.map(b => {
-            let status = 'Menunggu', statusClass = 'status-pending', timeInfo = 'Menunggu';
-            if (b.cancelled) { status = 'Dibatalkan'; statusClass = 'status-cancelled'; } 
-            else if (b.sent) { status = 'Terkirim'; statusClass = 'status-sent'; timeInfo = `Terkirim: ${new Date(b.sentTime).toLocaleString('id-ID')}`; } 
-            else if (b.scheduled) { status = 'Terjadwal'; statusClass = 'status-scheduled'; timeInfo = `Terjadwal: ${utils.formatDisplayTime(b.scheduledTime, b.timezone)}`; }
+            let status = 'Waiting', statusClass = 'status-pending', timeInfo = 'Waiting';
+            if (b.cancelled) { status = 'Canceled'; statusClass = 'status-cancelled'; } 
+            else if (b.sent) { status = 'Sent'; statusClass = 'status-sent'; timeInfo = `Sent: ${new Date(b.sentTime).toLocaleString('en-US')}`; } 
+            else if (b.scheduled) { status = 'Scheduled'; statusClass = 'status-scheduled'; timeInfo = `Scheduled: ${utils.formatDisplayTime(b.scheduledTime, b.timezone)}`; }
             
             return `<div class="admin-item" data-bot-id="${b.id}" onclick="app.populateBotEditor('${b.id}')">
                 <div class="admin-item-left">
@@ -1159,7 +1174,7 @@ const app = {
                 <div class="admin-item-right">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
                 </div>
-                <div class="swipe-hint">Geser untuk membatalkan</div>
+                <div class="swipe-hint">Swipe to cancel</div>
             </div>`;
         }).join('');
         this.initSwipeToDelete();
@@ -1223,7 +1238,7 @@ const app = {
 
     async deleteScriptConfirmation(scriptTitle) {
         if (!scriptTitle || !this.db.scripts[scriptTitle]) {
-            this.showToast('Script tidak ditemukan.', 'error');
+            this.showToast('Script not found.', 'error');
             await this.loadDatabase();
             return;
         }
@@ -1231,17 +1246,17 @@ const app = {
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Hapus Script',
-                text: `Yakin ingin menghapus “${scriptTitle}”?`,
+                title: 'Delete Script',
+                text: `Are you sure you want to delete “${scriptTitle}”?`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Hapus',
-                cancelButtonText: 'Batal',
+                confirmButtonText: 'Delete',
+                cancelButtonText: 'Cancel',
                 confirmButtonColor: '#ef4444'
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Yakin ingin menghapus “${scriptTitle}”?`);
+            shouldDelete = confirm(`Are you sure you want to delete “${scriptTitle}”?`);
         }
 
         if (shouldDelete) await this.deleteScriptLogic(scriptTitle);
@@ -1255,17 +1270,17 @@ const app = {
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
-                title: 'Batalkan Bot',
-                text: `Yakin ingin membatalkan “${bot.title}”?`,
+                title: 'Cancel Bot',
+                text: `Are you sure you want to cancel “${bot.title}”?`,
                 icon: 'warning',
                 showCancelButton: true,
-                confirmButtonText: 'Batalkan Bot',
-                cancelButtonText: 'Tetap Simpan',
+                confirmButtonText: 'Cancel Bot',
+                cancelButtonText: 'Keep',
                 confirmButtonColor: '#ef4444'
             });
             shouldDelete = result.isConfirmed;
         } else {
-            shouldDelete = confirm(`Yakin ingin membatalkan bot “${bot.title}”?`);
+            shouldDelete = confirm(`Are you sure you want to cancel bot “${bot.title}”?`);
         }
 
         if (shouldDelete) await this.deleteBotLogic(botId);
@@ -1280,7 +1295,7 @@ const app = {
             if (typeof NProgress !== 'undefined') NProgress.start();
 
             const script = this.db.scripts[scriptTitle];
-            if (!script) throw new Error('Script tidak ditemukan.');
+            if (!script) throw new Error('Script not found.');
 
             const scriptId = utils.sanitizeTitle(scriptTitle);
 
@@ -1317,7 +1332,7 @@ const app = {
                     const body = await dbRes.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Gagal memperbarui database — ${detail}`);
+                throw new Error(`Failed to update database — ${detail}`);
             }
 
             const newDbData = await dbRes.json();
@@ -1330,12 +1345,12 @@ const app = {
                 console.warn('Could not persist local database cache:', storageError);
             }
 
-            this.showToast('Script berhasil dihapus.', 'success');
+            this.showToast('Script deleted', 'success');
             await this.loadDatabase();
 
         } catch (e) {
-            console.error('Gagal menghapus:', e);
-            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
+            console.error('Delete error:', e);
+            this.showToast(`An error occurred: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1369,7 +1384,7 @@ const app = {
                     const body = await res.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Gagal membaca ${path} — ${detail}.`);
+                throw new Error(`Failed to read ${path} — ${detail}.`);
             }
 
             const fileData = await res.json();
@@ -1395,7 +1410,7 @@ const app = {
                     const body = await deleteRes.json();
                     if (body?.message) detail += `: ${body.message}`;
                 } catch (_) {}
-                throw new Error(`Gagal menghapus ${path} — ${detail}.`);
+                throw new Error(`Failed to delete ${path} — ${detail}.`);
             }
         }
     },
@@ -1431,12 +1446,12 @@ const app = {
                 if (dbRes.ok) {
                     const newDbData = await dbRes.json();
                     this.dbSha = newDbData.content.sha;
-                    this.showToast('Bot dibatalkan.', 'success');
+                    this.showToast('Bot canceled.', 'success');
                     await this.loadDatabase();
-                } else throw new Error('Gagal memperbarui database.');
+                } else throw new Error('Failed to update the database.');
             }
         } catch(e) {
-            this.showToast(`Terjadi kesalahan: ${e.message}`, 'error');
+            this.showToast(`An error occurred: ${e.message}`, 'error');
             await this.loadDatabase();
         } finally {
             this.actionInProgress = false;
@@ -1451,10 +1466,10 @@ const app = {
         this.destroyPageEditors();
         const heading = document.getElementById('editor-heading');
         const saveBtn = document.getElementById('page-save-btn');
-        if (heading) heading.textContent = 'Buat Page Baru';
-        if (saveBtn) saveBtn.textContent = 'Terbitkan Page';
+        if (heading) heading.textContent = 'New Page';
+        if (saveBtn) saveBtn.textContent = 'Publish Page';
         const status = document.getElementById('page-editor-status');
-        if (status) status.textContent = 'Draf';
+        if (status) status.textContent = 'Draft';
         const title = document.getElementById('edit-title');
         const visibility = document.getElementById('edit-visibility');
         const desc = document.getElementById('edit-desc');
@@ -1470,7 +1485,7 @@ const app = {
         const list = document.getElementById('script-editor-list');
         const countEl = document.getElementById('script-editor-count');
         const count = list ? list.querySelectorAll('.script-editor-card').length : 0;
-        if (countEl) countEl.textContent = `${count} script${''}`;
+        if (countEl) countEl.textContent = `${count} script${count === 1 ? '' : 's'}`;
     },
 
     addScriptEditor(script = null, code = '') {
@@ -1487,19 +1502,19 @@ const app = {
             <div class="script-editor-card-head">
                 <div class="script-index-badge">SCRIPT</div>
                 <div class="script-editor-card-title-wrap">
-                    <input type="text" class="input-field script-name-input" placeholder="Nama Script" value="${utils.escapeHtml(script?.name || '')}">
+                    <input type="text" class="input-field script-name-input" placeholder="Script Name" value="${utils.escapeHtml(script?.name || '')}">
                 </div>
-                <button class="icon-btn danger remove-script-btn" type="button" title="Hapus script" aria-label="Hapus script">
+                <button class="icon-btn danger remove-script-btn" type="button" title="Delete script" aria-label="Delete script">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6l-1 14H6L5 6m3 0V4h8v2"></path></svg>
                 </button>
             </div>
             <div class="script-editor-card-body">
                 <div class="script-editor-toolbar">
                     <span class="editor-file-badge">.lua</span>
-                    <button class="btn btn-secondary btn-xs insert-lua-btn" type="button">Sisipkan Lua</button>
+                    <button class="btn btn-secondary btn-xs insert-lua-btn" type="button">Insert Lua</button>
                 </div>
                 <div class="form-group">
-                    <label>Kode Lua</label>
+                    <label>Lua Code</label>
                     <textarea class="input-field page-code-textarea" data-editor-id="${editorId}">${utils.escapeHtml(code)}</textarea>
                 </div>
             </div>`;
@@ -1507,7 +1522,7 @@ const app = {
         card.querySelector('.remove-script-btn').addEventListener('click', event => {
             event.stopPropagation();
             if (list.querySelectorAll('.script-editor-card').length <= 1) {
-                this.showToast('Satu script minimal harus ada di dalam page.', 'warning');
+                this.showToast('A page must contain at least one script.', 'warning');
                 return;
             }
             const editor = this.pageEditors[editorId];
@@ -1530,7 +1545,7 @@ const app = {
             this.normalizeDatabase();
         }
         if (!this.db?.pages?.[title]) {
-            this.showToast('Page tidak ditemukan.', 'error');
+            this.showToast('Page not found.', 'error');
             return;
         }
         const page = this.db.pages[title];
@@ -1543,7 +1558,7 @@ const app = {
         const saveBtn = document.getElementById('page-save-btn');
         const status = document.getElementById('page-editor-status');
         if (heading) heading.textContent = `Edit: ${page.title}`;
-        if (saveBtn) saveBtn.textContent = 'Perbarui Page';
+        if (saveBtn) saveBtn.textContent = 'Update Page';
         if (status) status.textContent = 'Mengedit';
         document.getElementById('edit-title').value = page.title || '';
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
@@ -1572,14 +1587,14 @@ const app = {
     },
 
     resetBotEditor() {
-        document.getElementById('bot-editor-heading').textContent = 'Buat Bot Baru';
+        document.getElementById('bot-editor-heading').textContent = 'New Bot';
         document.getElementById('bot-title').value = '';
         document.getElementById('bot-message').value = '';
         document.getElementById('bot-schedule').checked = false;
         document.getElementById('bot-schedule-time').value = '';
         document.getElementById('bot-timezone').value = Intl.DateTimeFormat().resolvedOptions().timeZone;
         const saveBtn = document.querySelector('.bot-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = 'Kirim Bot';
+        if (saveBtn) saveBtn.textContent = 'Send Bot';
         this.currentBotId = null;
         this.toggleScheduleFields();
     },
@@ -1589,7 +1604,7 @@ const app = {
         const bot = this.db.bots[botId];
         
         if (bot.sent) {
-            this.showToast('Posting yang sudah terkirim tidak dapat diedit.', 'error');
+            this.showToast('A sent post cannot be edited.', 'error');
             this.switchAdminTab('bots');
             return;
         }
@@ -1610,7 +1625,7 @@ const app = {
         document.getElementById('bot-timezone').value = bot.timezone || Intl.DateTimeFormat().resolvedOptions().timeZone;
         
         const saveBtn = document.querySelector('.bot-actions .btn:last-child');
-        if (saveBtn) saveBtn.textContent = bot.scheduled ? 'Perbarui Jadwal' : 'Kirim Sekarang';
+        if (saveBtn) saveBtn.textContent = bot.scheduled ? 'Update Schedule' : 'Send Now';
         this.toggleScheduleFields();
     },
 
@@ -1625,13 +1640,13 @@ const app = {
 
     explainGithubError(status, body = {}) {
         const message = body?.message || '';
-        if (status === 401) return 'Token GitHub tidak valid, kedaluwarsa, atau tidak dapat digunakan.';
-        if (status === 403) return 'Akses GitHub ditolak. Pastikan token memiliki izin Contents: Read and write pada repository.';
-        if (status === 404) return 'Repository atau file tidak ditemukan. Periksa nama repository dan branch.';
-        if (status === 409) return 'Terjadi benturan perubahan di GitHub. Data terbaru akan dimuat ulang; coba terbitkan lagi.';
-        if (status === 422) return `GitHub menolak permintaan. ${message || 'Periksa isi data dan branch tujuan.'}`;
-        if (status >= 500) return `GitHub sedang bermasalah (HTTP ${status}). Coba lagi beberapa saat lagi.`;
-        return message ? `GitHub: ${message} (HTTP ${status}).` : `GitHub mengembalikan HTTP ${status}.`;
+        if (status === 401) return 'The GitHub token is invalid, expired, or unusable.';
+        if (status === 403) return 'GitHub access was denied. Make sure the token has Contents: Read and write permission for the repository.';
+        if (status === 404) return 'Repository or file not found. Check the repository name and branch.';
+        if (status === 409) return 'A GitHub change conflict occurred. The latest data will be reloaded; try publishing again.';
+        if (status === 422) return `GitHub rejected the request. ${message || 'Check the request data and target branch.'}`;
+        if (status >= 500) return `GitHub is experiencing a problem (HTTP ${status}). Try again in a moment.`;
+        return message ? `GitHub: ${message} (HTTP ${status}).` : `GitHub returned HTTP ${status}.`;
     },
 
     async getRemoteDatabaseSha() {
@@ -1679,7 +1694,7 @@ const app = {
 
     async savePage() {
         if (!this.currentUser || !this.db) {
-            this.showToast('Silakan masuk terlebih dahulu.', 'error');
+            this.showToast('Please sign in first.', 'error');
             return;
         }
         if (this.actionInProgress) return;
@@ -1695,13 +1710,13 @@ const app = {
         const titleError = utils.validateTitle(title);
         try {
             if (titleError) throw new Error(titleError);
-            if (!pageId) throw new Error('Judul page menghasilkan URL yang tidak valid.');
-            if (!collected.length) throw new Error('Tambahkan minimal 1 script ke dalam page.');
+            if (!pageId) throw new Error('The page title does not produce a valid URL.');
+            if (!collected.length) throw new Error('Add at least one script to the page.');
             const duplicateIds = new Set();
             const prepared = this.makeUniqueScriptIds(collected, oldPage);
             for (const script of prepared) {
-                if (!script.name) throw new Error('Semua Nama Script wajib diisi.');
-                if (duplicateIds.has(script.id)) throw new Error(`Nama file script “${script.name}” bentrok. Ubah nama script.`);
+                if (!script.name) throw new Error('Every Script Name is required.');
+                if (duplicateIds.has(script.id)) throw new Error(`The script file name for “${script.name}” conflicts with another script. Rename it.`);
                 duplicateIds.add(script.id);
                 const codeError = utils.validateCode(script.code);
                 if (codeError) throw new Error(`Script “${script.name}”: ${codeError}`);
@@ -1710,10 +1725,10 @@ const app = {
                 if (isEditing && existingTitle === this.currentEditingPageTitle) return false;
                 return (page.id || utils.sanitizeTitle(existingTitle)) === pageId;
             });
-            if (pageExists) throw new Error('ID Page sudah dipakai. Gunakan judul yang berbeda.');
+            if (pageExists) throw new Error('This Page ID is already in use. Choose a different title.');
 
             this.actionInProgress = true;
-            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Memperbarui...' : 'Menerbitkan...'; }
+            if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = isEditing ? 'Updating...' : 'Publishing...'; }
             if (typeof NProgress !== 'undefined') NProgress.start();
 
             // Validate repository access before writing any generated files.
@@ -1743,21 +1758,21 @@ const app = {
             nextDb.pages[title] = pageData;
             this.db = nextDb;
             this.normalizeDatabase();
-            await this.persistDatabase(`${isEditing ? 'Perbarui' : 'Terbitkan'} page: ${title}`);
+            await this.persistDatabase(`${isEditing ? 'Update' : 'Publish'} page: ${title}`);
             try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
 
             this.currentEditingPageTitle = title;
             this.originalTitle = title;
             this.originalPageId = pageId;
-            this.showToast(isEditing ? 'Page berhasil diperbarui.' : 'Page berhasil diterbitkan.', 'success');
+            this.showToast(isEditing ? 'Page updated successfully.' : 'Page published successfully.', 'success');
             this.renderList();
             this.renderAdminList();
-            document.getElementById('page-editor-status') && (document.getElementById('page-editor-status').textContent = 'Tersimpan');
+            document.getElementById('page-editor-status') && (document.getElementById('page-editor-status').textContent = 'Saved');
             document.getElementById('editor-heading') && (document.getElementById('editor-heading').textContent = `Edit: ${title}`);
-            if (saveBtn) saveBtn.textContent = 'Perbarui Page';
+            if (saveBtn) saveBtn.textContent = 'Update Page';
         } catch (error) {
             console.error('Page save error:', error);
-            this.showToast(`Gagal menerbitkan page: ${error.message}`, 'error');
+            this.showToast(`Failed to publish the page: ${error.message}`, 'error');
         } finally {
             if (saveBtn) saveBtn.disabled = false;
             this.actionInProgress = false;
@@ -1787,7 +1802,7 @@ const app = {
         if (res.status === 404) return;
         if (!res.ok) { let body = {}; try { body = await res.json(); } catch (_) {} throw new Error(`${this.explainGithubError(res.status, body)} File: ${path}`); }
         const file = await res.json();
-        const del = await fetch(url, { method: 'DELETE', headers: this.githubHeaders(), body: JSON.stringify({ message: `Hapus file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
+        const del = await fetch(url, { method: 'DELETE', headers: this.githubHeaders(), body: JSON.stringify({ message: `Delete file: ${path}`, sha: file.sha, branch: CONFIG.branch }) });
         if (!del.ok) { let body = {}; try { body = await del.json(); } catch (_) {} throw new Error(`${this.explainGithubError(del.status, body)} File: ${path}`); }
     },
 
@@ -1799,16 +1814,16 @@ const app = {
         const escapedTitle = utils.escapeHtml(page.title);
         const manifest = this.safeJsonForScript((page.scripts || []).map(script => ({ id: script.id, name: script.name, filename: script.filename })));
         const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
-        const created = new Date(page.created || Date.now()).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+        const created = new Date(page.created || Date.now()).toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
 
         return `<!DOCTYPE html>
-<html lang="id">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapedTitle} - CihuyAkz Studio Lite</title>
-    <link rel="icon" type="image/png" href="../../assets/favicon.ico">
-    <link rel="stylesheet" href="../../style.css?v=20260925-page-builder">
+    <link rel="icon" type="image/png" href="${CONFIG.pageUrl('assets/favicon.ico')}">
+    <link rel="stylesheet" href="${CONFIG.pageUrl('style.css?v=20260925-page-builder')}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -1816,13 +1831,13 @@ const app = {
     <nav class="navbar">
         <div class="nav-content">
             <div class="nav-left">
-                <a href="../../index.html" class="brand" style="text-decoration:none;color:inherit;">
+                <a href="${CONFIG.pageUrl('')}" class="brand" style="text-decoration:none;color:inherit;">
                     <img src="../../assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
                     <span class="nav-title">CihuyAkz Studio Lite</span>
                 </a>
             </div>
             <div class="nav-right">
-                <a href="../../index.html" class="btn btn-secondary btn-sm">Kembali</a>
+                <a href="${CONFIG.pageUrl('')}" class="btn btn-secondary btn-sm">Back</a>
             </div>
         </div>
     </nav>
@@ -1831,11 +1846,11 @@ const app = {
         <section id="script-content" class="script-page-content">
             <div class="script-header-lg page-hero-header">
                 <div>
-                    <span class="page-kicker">HALAMAN SCRIPT</span>
+                    <span class="page-kicker">SCRIPT PAGE</span>
                     <h1>${escapedTitle}</h1>
                     <div class="meta-row">
-                        <span class="meta-badge">${(page.scripts || []).length} script</span>
-                        <span class="meta-badge">Diperbarui ${created}</span>
+                        <span class="meta-badge">${(page.scripts || []).length} scripts</span>
+                        <span class="meta-badge">Updated ${created}</span>
                     </div>
                 </div>
             </div>
@@ -1862,7 +1877,7 @@ const app = {
 
         function renderScripts() {
             tabs.innerHTML = SCRIPTS.map((script, index) => '<button class="page-script-tab' + (index === 0 ? ' active' : '') + '" data-index="' + index + '">' + escapeHtml(script.name) + '</button>').join('');
-            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Salin</button><button class="btn btn-sm" type="button" data-download="' + index + '">Unduh</button><a href="raw/' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Kode Asli</a></div></div><pre><code id="code-' + index + '" class="language-lua">Memuat...</code></pre></div></section>').join('');
+            panels.innerHTML = SCRIPTS.map((script, index) => '<section class="page-script-panel' + (index === 0 ? ' active' : '') + '" data-panel="' + index + '"><div class="code-box"><div class="toolbar"><div class="file-info">raw/' + escapeHtml(script.filename) + '</div><div class="toolbar-right"><button class="btn btn-sm" type="button" data-copy="' + index + '">Copy</button><button class="btn btn-sm" type="button" data-download="' + index + '">Download</button><a href="' + encodeURIComponent(script.filename) + '" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-' + index + '" class="language-lua">Loading...</code></pre></div></section>').join('');
 
             tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
                 const index = Number(tab.dataset.index);
@@ -1888,7 +1903,7 @@ const app = {
                     }
                 } catch (_) {
                     const block = document.getElementById('code-' + index);
-                    if (block) block.textContent = '-- Kode Lua gagal dimuat.';
+                    if (block) block.textContent = '-- Failed to load Lua source';
                 }
             }));
         }
@@ -1898,7 +1913,7 @@ const app = {
                 const code = sourceCache[index] || '';
                 await navigator.clipboard.writeText(code);
                 const original = btn.textContent;
-                btn.textContent = 'Tersalin';
+                btn.textContent = 'Copied';
                 setTimeout(() => btn.textContent = original, 1600);
             } catch (_) {}
         }
@@ -1933,7 +1948,7 @@ const app = {
             throw new Error(`${this.explainGithubError(getRes.status, body)} File: ${path}`);
         }
         const body = {
-            message: `Terbitkan ${path}`,
+            message: `Publish ${path}`,
             content: utils.safeBtoa(content),
             branch: CONFIG.branch,
             ...(sha ? { sha } : {})
@@ -1946,164 +1961,22 @@ const app = {
         return await putRes.json();
     },
 
-    getPageById(pageId) {
-        this.normalizeDatabase();
-        const id = String(pageId || '').trim();
-        if (!id) return null;
-        return Object.values(this.db.pages || {}).find(page => (page.id || utils.sanitizeTitle(page.title)) === id) || null;
-    },
-
-    async renderPageViewer(pageId) {
-        const view = document.getElementById('view-page');
-        const content = document.getElementById('page-view-content');
-        if (!view || !content) return;
-
-        let page = this.getPageById(pageId);
-        if (!page) {
-            try {
-                const freshRes = await fetch(`database.json?t=${CONFIG.cacheBuster()}`, { cache: 'no-store', headers: { 'Cache-Control': 'no-cache' } });
-                if (freshRes.ok) {
-                    this.db = await freshRes.json();
-                    this.normalizeDatabase();
-                    try { localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db)); } catch (_) {}
-                    page = this.getPageById(pageId);
-                }
-            } catch (error) {
-                console.warn('Gagal memperbarui database saat membuka page:', error);
-            }
-        }
-        if (!page) {
-            content.innerHTML = `
-                <div class="empty-state page-not-found-state">
-                    <div class="empty-state-icon">?</div>
-                    <h2>Page tidak ditemukan</h2>
-                    <p>Page yang kamu buka belum tersedia atau sudah dihapus.</p>
-                    <button class="btn btn-primary" type="button" onclick="navigate('')">Kembali ke Situs</button>
-                </div>`;
-            return;
-        }
-
-        const scripts = Array.isArray(page.scripts) ? page.scripts : [];
-        const pageIdSafe = page.id || utils.sanitizeTitle(page.title);
-        const folder = page.legacy ? 'scripts' : 'pages';
-        const rawBase = `${CONFIG.pagesBaseUrl()}${folder}/${encodeURIComponent(pageIdSafe)}/raw/`;
-        const created = new Date(page.updated || page.created || Date.now()).toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-        const description = page.description ? `<p class="script-description">${utils.escapeHtml(page.description)}</p>` : '';
-
-        content.innerHTML = `
-            <div class="script-header-lg page-hero-header">
-                <div>
-                    <span class="page-kicker">HALAMAN SCRIPT</span>
-                    <h1>${utils.escapeHtml(page.title)}</h1>
-                    <div class="meta-row">
-                        <span class="meta-badge">${scripts.length} script</span>
-                        <span class="meta-badge">Diperbarui ${created}</span>
-                    </div>
-                </div>
-            </div>
-            ${description}
-            ${scripts.length ? `
-                <div id="page-script-tabs" class="page-script-tabs"></div>
-                <div id="page-script-panels" class="page-script-panels"></div>` : `
-                <div class="empty-state"><h2>Belum ada script</h2><p>Page ini belum memiliki script yang dapat ditampilkan.</p></div>`}`;
-
-        if (!scripts.length) return;
-
-        const tabs = document.getElementById('page-script-tabs');
-        const panels = document.getElementById('page-script-panels');
-        const sourceCache = {};
-        tabs.innerHTML = scripts.map((script, index) => `<button class="page-script-tab${index === 0 ? ' active' : ''}" data-index="${index}" type="button">${utils.escapeHtml(script.name || `Script ${index + 1}`)}</button>`).join('');
-        panels.innerHTML = scripts.map((script, index) => {
-            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
-            return `<section class="page-script-panel${index === 0 ? ' active' : ''}" data-panel="${index}">
-                <div class="code-box">
-                    <div class="toolbar">
-                        <div class="file-info">${utils.escapeHtml(filename)}</div>
-                        <div class="toolbar-right">
-                            <button class="btn btn-sm" type="button" data-copy="${index}">Salin</button>
-                            <button class="btn btn-sm" type="button" data-download="${index}">Unduh</button>
-                            <a href="${rawBase}${encodeURIComponent(filename)}" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Kode Asli</a>
-                        </div>
-                    </div>
-                    <pre><code id="page-code-${index}" class="language-lua">Memuat...</code></pre>
-                </div>
-            </section>`;
-        }).join('');
-
-        tabs.querySelectorAll('.page-script-tab').forEach(tab => tab.addEventListener('click', () => {
-            const index = Number(tab.dataset.index);
-            tabs.querySelectorAll('.page-script-tab').forEach(item => item.classList.toggle('active', Number(item.dataset.index) === index));
-            panels.querySelectorAll('.page-script-panel').forEach(panel => panel.classList.toggle('active', Number(panel.dataset.panel) === index));
-        }));
-        tabs.querySelectorAll('[data-copy]').forEach(button => button.addEventListener('click', async () => {
-            const index = Number(button.dataset.copy);
-            try {
-                await navigator.clipboard.writeText(sourceCache[index] || '');
-                const original = button.textContent;
-                button.textContent = 'Tersalin';
-                setTimeout(() => button.textContent = original, 1400);
-            } catch (_) {
-                this.showToast('Tidak dapat menyalin kode.', 'error');
-            }
-        }));
-        tabs.querySelectorAll('[data-download]').forEach(button => button.addEventListener('click', () => {
-            const index = Number(button.dataset.download);
-            const script = scripts[index];
-            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
-            const blobUrl = URL.createObjectURL(new Blob([sourceCache[index] || ''], { type: 'text/plain;charset=utf-8' }));
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
-        }));
-
-        await Promise.all(scripts.map(async (script, index) => {
-            const filename = script.filename || `${script.id || `script-${index + 1}`}.lua`;
-            try {
-                const response = await fetch(`${rawBase}${encodeURIComponent(filename)}`, { cache: 'no-store' });
-                if (!response.ok) throw new Error(`HTTP ${response.status}`);
-                const code = await response.text();
-                sourceCache[index] = code;
-                const block = document.getElementById(`page-code-${index}`);
-                if (block) {
-                    block.textContent = code;
-                    if (typeof Prism !== 'undefined') Prism.highlightElement(block);
-                }
-            } catch (error) {
-                const block = document.getElementById(`page-code-${index}`);
-                if (block) block.textContent = '-- Kode Lua gagal dimuat.';
-                console.warn('Gagal memuat source Lua:', filename, error);
-            }
-        }));
-    },
-
     handleRouting() {
         const hash = location.hash.slice(1);
-        const pageId = new URLSearchParams(location.search).get('page');
         document.querySelectorAll('.view-section').forEach(el => el.style.display = 'none');
         window.scrollTo(0, 0);
-
+        
         if (hash === 'admin') {
             if (!this.currentUser) {
                 this.toggleLoginModal();
-                window.location.href = CONFIG.pagesBaseUrl();
+                location.hash = '';
                 return;
             }
             document.getElementById('view-admin').style.display = 'block';
             this.switchAdminTab('list');
-            return;
+        } else {
+            document.getElementById('view-home').style.display = 'block';
         }
-
-        if (pageId) {
-            document.getElementById('view-page').style.display = 'block';
-            this.renderPageViewer(pageId);
-            return;
-        }
-
-        document.getElementById('view-home').style.display = 'block';
     }
 };
 
@@ -2112,8 +1985,7 @@ function navigate(path) {
         app.toggleLoginModal();
         return;
     }
-    const base = CONFIG.pagesBaseUrl();
-    window.location.href = path ? `${base}#${encodeURIComponent(path)}` : base;
+    location.hash = path;
 }
 
 window.addEventListener('DOMContentLoaded', () => {

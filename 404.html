@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Loading Page - CihuyAkz Studio Lite</title>
+  <script>
+    (() => {
+      const parts = location.pathname.split('/').filter(Boolean);
+      const repoSegment = location.hostname.endsWith('.github.io') ? (parts[0] || '') : '';
+      const base = repoSegment ? location.origin + '/' + encodeURIComponent(repoSegment) + '/' : location.origin + '/';
+      document.write('<link rel="icon" type="image/png" href="' + base + 'assets/favicon.ico">');
+      document.write('<link rel="stylesheet" href="' + base + 'style.css?v=20260925-404-fallback">');
+    })();
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+</head>
+<body class="script-page-body">
+  <nav class="navbar">
+    <div class="nav-content">
+      <div class="nav-left">
+        <a id="brand-link" href="./" class="brand" style="text-decoration:none;color:inherit;">
+          <img src="assets/cihuyakz-icon.png" class="nav-icon" alt="Icon">
+          <span class="nav-title">CihuyAkz Studio Lite</span>
+        </a>
+      </div>
+      <div class="nav-right"><a id="back-link" href="./" class="btn btn-secondary btn-sm">Back</a></div>
+    </div>
+  </nav>
+  <main class="container script-page-container">
+    <section id="script-content" class="script-page-content">
+      <div class="script-header-lg page-hero-header"><div><span class="page-kicker">PAGE</span><h1 id="page-title">Loading...</h1><div class="meta-row"><span class="meta-badge" id="script-count">Loading...</span><span class="meta-badge" id="page-date"></span></div></div></div>
+      <p class="script-description" id="page-description"></p>
+      <div id="page-script-tabs" class="page-script-tabs"></div>
+      <div id="page-script-panels" class="page-script-panels"></div>
+      <div id="fallback-error" style="display:none;margin-top:20px;padding:18px;border-radius:16px;border:1px solid rgba(255,80,80,.18);background:rgba(255,80,80,.06);color:#e9d7da">Page could not be loaded. Check that the page has been published and try again.</div>
+    </section>
+  </main>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-lua.min.js"></script>
+  <script>
+    (() => {
+      const parts = location.pathname.split('/').filter(Boolean);
+      const repoSegment = location.hostname.endsWith('.github.io') ? (parts[0] || '') : '';
+      const base = repoSegment ? location.origin + '/' + encodeURIComponent(repoSegment) + '/' : location.origin + '/';
+      const normalizedPath = parts.map(p => decodeURIComponent(p));
+      const pageIndex = normalizedPath.findIndex(p => p === 'pages' || p === 'scripts');
+      const pageId = pageIndex >= 0 ? normalizedPath[pageIndex + 1] : '';
+      const pageType = pageIndex >= 0 ? normalizedPath[pageIndex] : 'pages';
+      const pageRoot = pageId ? base + pageType + '/' + encodeURIComponent(pageId) + '/' : base;
+      const dbUrl = base + 'database.json?fallback=' + Date.now();
+      const brandLink = document.getElementById('brand-link');
+      const backLink = document.getElementById('back-link');
+      brandLink.href = base;
+      backLink.href = base;
+
+      function esc(text) { const d=document.createElement('div'); d.textContent=text==null?'':String(text); return d.innerHTML; }
+      function showError() { document.getElementById('fallback-error').style.display='block'; }
+      async function load() {
+        if (!pageId) { location.replace(base); return; }
+        try {
+          const res = await fetch(dbUrl, {cache:'no-store'});
+          if (!res.ok) throw new Error('database ' + res.status);
+          const db = await res.json();
+          const page = db?.pages?.[Object.keys(db.pages || {}).find(title => {
+            const item=db.pages[title]; return (item?.id || title.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'')) === pageId;
+          })];
+          if (!page) throw new Error('page not found');
+          document.title = page.title + ' - CihuyAkz Studio Lite';
+          document.getElementById('page-title').textContent = page.title;
+          document.getElementById('script-count').textContent = `${(page.scripts||[]).length} script${(page.scripts||[]).length === 1 ? '' : 's'}`;
+          document.getElementById('page-date').textContent = 'Updated ' + new Date(page.updated || page.created || Date.now()).toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'numeric'});
+          const desc = document.getElementById('page-description'); desc.textContent = page.description || ''; desc.style.display = page.description ? 'block' : 'none';
+          const scripts = Array.isArray(page.scripts) ? page.scripts : [];
+          const tabs = document.getElementById('page-script-tabs');
+          const panels = document.getElementById('page-script-panels');
+          tabs.innerHTML = scripts.map((s,i)=>`<button class="page-script-tab${i===0?' active':''}" data-index="${i}">${esc(s.name)}</button>`).join('');
+          panels.innerHTML = scripts.map((s,i)=>`<section class="page-script-panel${i===0?' active':''}" data-panel="${i}"><div class="code-box"><div class="toolbar"><div class="file-info">raw/${esc(s.filename)}</div><div class="toolbar-right"><button class="btn btn-sm" data-copy="${i}" type="button">Copy</button><a href="${pageRoot}raw/${encodeURIComponent(s.filename)}" class="btn btn-secondary btn-sm" target="_blank" rel="noopener">Raw</a></div></div><pre><code id="code-${i}" class="language-lua">Loading...</code></pre></div></section>`).join('');
+          tabs.querySelectorAll('.page-script-tab').forEach(tab=>tab.addEventListener('click',()=>{const i=Number(tab.dataset.index);tabs.querySelectorAll('.page-script-tab').forEach(t=>t.classList.toggle('active',Number(t.dataset.index)===i));panels.querySelectorAll('.page-script-panel').forEach(p=>p.classList.toggle('active',Number(p.dataset.panel)===i));}));
+          await Promise.all(scripts.map(async (s,i)=>{
+            try { const r=await fetch(pageRoot+'raw/'+encodeURIComponent(s.filename),{cache:'no-store'}); if(!r.ok) throw new Error(r.status); const code=await r.text(); const el=document.getElementById('code-'+i); el.textContent=code; Prism.highlightElement(el); }
+            catch(e){ const el=document.getElementById('code-'+i); if(el) el.textContent='-- Failed to load Lua source'; }
+          }));
+          tabs.querySelectorAll('[data-copy]').forEach(btn=>btn.addEventListener('click',async()=>{ const i=Number(btn.dataset.copy); try { const r=await fetch(pageRoot+'raw/'+encodeURIComponent(scripts[i].filename)); const code=await r.text(); await navigator.clipboard.writeText(code); const old=btn.textContent; btn.textContent='Copied'; setTimeout(()=>btn.textContent=old,1200); } catch(_){} }));
+        } catch (_) { showError(); }
+      }
+      load();
+    })();
+  </script>
+</body>
+</html>
