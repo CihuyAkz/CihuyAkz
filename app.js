@@ -1,10 +1,22 @@
 const CONFIG = {
     // GitHub repository used for publishing. Only this GitHub account may log in.
-    repoOwner: 'simplyIeaf',
-    repo: 'simplyIeaf.github.io',
+    repoOwner: 'CihuyAkz',
+    repo: 'CihuyAkz',
     allowedUser: 'CihuyAkz',
     branch: 'main',
-    cacheBuster: () => Date.now()
+    cacheBuster: () => Date.now(),
+    // Builds the public GitHub Pages base URL from repoOwner/repo so raw
+    // script fetches keep working no matter which account this is forked to.
+    // User page (repo named "<owner>.github.io") -> https://owner.github.io/
+    // Project page (any other repo name)          -> https://owner.github.io/repo/
+    pagesBaseUrl() {
+        const ownerLower = this.repoOwner.toLowerCase();
+        const repoLower = this.repo.toLowerCase();
+        if (repoLower === `${ownerLower}.github.io`) {
+            return `https://${ownerLower}.github.io/`;
+        }
+        return `https://${ownerLower}.github.io/${this.repo}/`;
+    }
 };
 
 const utils = {
@@ -106,6 +118,7 @@ const app = {
     isLoading: false,
     searchQuery: '',
     scheduledTimers: {},
+    thumbnailPreviewHoverActive: false,
     
     async init() {
         const sessionValid = await this.loadSession();
@@ -687,7 +700,6 @@ const app = {
                         ${s.visibility !== 'PUBLIC' ? `<span class="badge badge-${s.visibility.toLowerCase()}">${s.visibility}</span>` : ''}
                     </div>
                     ${s.description ? `<p class="script-card-description">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
-                    ${thumbnail ? `<span class="thumbnail-hint">Hover to preview thumbnail</span>` : ''}
                     <div class="card-meta">
                         <span>${new Date(s.created).toLocaleDateString()}</span>
                         ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
@@ -1073,6 +1085,7 @@ const app = {
         if (editThumbnail) editThumbnail.value = '';
         const editThumbnailEnabled = document.getElementById('edit-thumbnail-enabled');
         if (editThumbnailEnabled) editThumbnailEnabled.checked = true;
+        this.resetThumbnailPreviewHoverToggle();
         this.resetThumbnailAdjust();
         
         if (window.cmEditor) window.cmEditor.setValue('');
@@ -1123,6 +1136,7 @@ const app = {
         if (!input || !preview) return;
 
         this.syncThumbnailAdjustLabels();
+        preview.classList.toggle('show-hover-gradient', this.thumbnailPreviewHoverActive);
 
         const value = input.value.trim();
         const enabled = enabledCheckbox ? enabledCheckbox.checked : true;
@@ -1143,7 +1157,35 @@ const app = {
         const { scale, posX, posY } = this.getThumbnailAdjustValues();
         preview.classList.remove('preview-error');
         preview.classList.add('has-image');
-        preview.innerHTML = `<div class="thumbnail-preview-glow"></div><img src="${safeValue}" alt="Thumbnail preview" style="--thumb-scale:${scale};--thumb-pos-x:${posX}%;--thumb-pos-y:${posY}%;" onerror="this.closest('.thumbnail-preview').classList.add('preview-error')">`;
+        preview.innerHTML = `<div class="thumbnail-preview-glow"></div><div class="thumbnail-preview-gradient"></div><img src="${safeValue}" alt="Thumbnail preview" style="--thumb-scale:${scale};--thumb-pos-x:${posX}%;--thumb-pos-y:${posY}%;" onerror="this.closest('.thumbnail-preview').classList.add('preview-error')">`;
+    },
+
+    toggleThumbnailPreviewHover() {
+        this.thumbnailPreviewHoverActive = !this.thumbnailPreviewHoverActive;
+        const btn = document.getElementById('thumbnail-preview-hover-btn');
+        if (btn) {
+            btn.classList.toggle('active', this.thumbnailPreviewHoverActive);
+            btn.setAttribute('aria-pressed', this.thumbnailPreviewHoverActive ? 'true' : 'false');
+            const label = this.thumbnailPreviewHoverActive ? 'Hide Hover' : 'Preview Hover';
+            const icon = btn.querySelector('svg');
+            btn.innerHTML = '';
+            if (icon) btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(' ' + label));
+        }
+        this.updateThumbnailPreview();
+    },
+
+    resetThumbnailPreviewHoverToggle() {
+        this.thumbnailPreviewHoverActive = false;
+        const btn = document.getElementById('thumbnail-preview-hover-btn');
+        if (btn) {
+            btn.classList.remove('active');
+            btn.setAttribute('aria-pressed', 'false');
+            const icon = btn.querySelector('svg');
+            btn.innerHTML = '';
+            if (icon) btn.appendChild(icon);
+            btn.appendChild(document.createTextNode(' Preview Hover'));
+        }
     },
 
     getThumbnailAdjustValues() {
@@ -1219,11 +1261,12 @@ const app = {
         if (posXInput) posXInput.value = typeof s.thumbnailPosX === 'number' ? s.thumbnailPosX : 50;
         const posYInput = document.getElementById('edit-thumbnail-pos-y');
         if (posYInput) posYInput.value = typeof s.thumbnailPosY === 'number' ? s.thumbnailPosY : 50;
+        this.resetThumbnailPreviewHoverToggle();
         this.updateThumbnailPreview();
         
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
-            const rawUrl = `https://simplyieaf.github.io/scripts/${this.originalScriptId}/raw/${this.originalScriptId}.lua`;
+            const rawUrl = `${CONFIG.pagesBaseUrl()}scripts/${this.originalScriptId}/raw/${this.originalScriptId}.lua`;
             const res = await fetch(rawUrl, { cache: 'no-store' });
             
             if (res.ok) {

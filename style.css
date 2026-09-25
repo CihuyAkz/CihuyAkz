@@ -257,6 +257,7 @@ input, button, textarea, select {
     border: 1px solid var(--color-border); 
     border-radius: 12px;
     padding: 24px; 
+    min-height: 176px;
     cursor: pointer;
     transition: all 0.2s ease; 
     display: flex; 
@@ -340,37 +341,10 @@ input, button, textarea, select {
     display: none;
 }
 
-.script-card.thumbnail-error .thumbnail-hint {
-    display: none;
-}
-
-.script-card.thumbnail-error .thumbnail-hint {
-    display: none;
-}
-
 .script-card-description {
     color: var(--color-text-muted);
     font-size: 13px;
     margin: 8px 0;
-}
-
-.thumbnail-hint {
-    display: block;
-    margin-top: 4px;
-    font-size: 10px;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
-    color: rgba(255, 164, 164, 0.76);
-    opacity: 0.72;
-    transition: opacity 0.2s ease;
-}
-
-.script-card.has-thumbnail:hover .thumbnail-hint,
-.script-card.has-thumbnail:focus-visible .thumbnail-hint,
-.script-card.has-thumbnail:focus-within .thumbnail-hint,
-.script-card.has-thumbnail:active .thumbnail-hint {
-    opacity: 0;
 }
 
 .card-header-section { 
@@ -875,12 +849,15 @@ textarea.input-field {
 .thumbnail-preview-wrap {
     width: 240px;
     min-width: 200px;
+    display: flex;
+    flex-direction: column;
 }
 
 .thumbnail-preview {
     position: relative;
     min-height: 120px;
     height: 100%;
+    flex: 1;
     border: 1px dashed rgba(255, 84, 84, 0.22);
     border-radius: 10px;
     overflow: hidden;
@@ -907,6 +884,53 @@ textarea.input-field {
     transform-origin: var(--thumb-pos-x, 50%) var(--thumb-pos-y, 50%);
     transform: scale(var(--thumb-scale, 1));
     transition: transform 0.15s ease;
+}
+
+.thumbnail-preview-gradient {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    opacity: 0;
+    pointer-events: none;
+    background:
+        linear-gradient(180deg, rgba(255, 66, 66, 0.02) 0%, rgba(255, 39, 64, 0.18) 48%, rgba(15, 2, 7, 0.78) 100%),
+        radial-gradient(circle at 22% 12%, rgba(255, 128, 128, 0.34), transparent 36%),
+        radial-gradient(circle at 88% 90%, rgba(178, 0, 42, 0.38), transparent 44%),
+        linear-gradient(120deg, rgba(255, 63, 63, 0.18), transparent 36%, rgba(215, 25, 63, 0.20) 70%, rgba(80, 0, 18, 0.52));
+    mix-blend-mode: screen;
+    transition: opacity 0.25s ease;
+}
+
+.thumbnail-preview.show-hover-gradient .thumbnail-preview-gradient {
+    opacity: 1;
+}
+
+.thumbnail-preview-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.thumbnail-preview-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--color-text-muted);
+}
+
+.thumbnail-preview-toggle-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.thumbnail-preview-toggle-btn.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
 }
 
 .thumbnail-label-row {

@@ -224,6 +224,13 @@
                                 <small class="form-hint">The image always fills the card at 100% zoom, so there is never a black bar. Zooming in only crops further into the image; drag the sliders to pick exactly what shows.</small>
                             </div>
                             <div class="thumbnail-preview-wrap">
+                                <div class="thumbnail-preview-toolbar">
+                                    <span class="thumbnail-preview-label">Preview</span>
+                                    <button type="button" id="thumbnail-preview-hover-btn" class="btn btn-secondary btn-sm thumbnail-preview-toggle-btn" onclick="app.toggleThumbnailPreviewHover()" aria-pressed="false">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                        Preview Hover
+                                    </button>
+                                </div>
                                 <div id="thumbnail-preview" class="thumbnail-preview" aria-hidden="true">
                                     <span>No thumbnail</span>
                                 </div>
