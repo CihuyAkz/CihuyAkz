@@ -5,6 +5,7 @@ const CONFIG = {
     allowedUser: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
+    localDbCacheVersion: '20260925-reset-mobile-v2',
 
     // GitHub Pages URL for this project fork.
     pagesBaseUrl() {
@@ -103,6 +104,7 @@ const app = {
     scheduledTimers: {},
     
     async init() {
+        this.prepareLocalDatabaseCache();
         const sessionValid = await this.loadSession();
         await this.loadDatabase();
         this.handleRouting();
@@ -232,6 +234,19 @@ const app = {
         if (unlistedFilter) unlistedFilter.style.display = 'block';
     },
 
+    prepareLocalDatabaseCache() {
+        try {
+            const versionKey = 'cihuyakz_local_db_version';
+            const currentVersion = localStorage.getItem(versionKey);
+            if (currentVersion !== CONFIG.localDbCacheVersion) {
+                localStorage.removeItem('cihuyakz_local_db_v2');
+                localStorage.setItem(versionKey, CONFIG.localDbCacheVersion);
+            }
+        } catch (e) {
+            console.warn('Could not prepare local database cache:', e);
+        }
+    },
+
     normalizeDatabase(database) {
         const db = (database && typeof database === 'object') ? database : {};
         if (!db.bots || typeof db.bots !== 'object') db.bots = {};
@@ -273,7 +288,7 @@ const app = {
                 delete db.pages[pageId];
                 return;
             }
-            page.id = page.id || pageId;
+            page.id = pageId;
             page.title = page.title || page.displayTitle || pageId;
             page.displayTitle = page.displayTitle || page.title;
             page.visibility = page.visibility || 'PUBLIC';
@@ -286,7 +301,7 @@ const app = {
                     delete page.scripts[scriptId];
                     return;
                 }
-                script.id = script.id || scriptId;
+                script.id = scriptId;
                 script.name = script.name || script.displayName || script.title || scriptId;
                 script.displayName = script.displayName || script.name;
                 script.filename = script.filename || `${scriptId}.lua`;
@@ -361,9 +376,10 @@ const app = {
         if (typeof Toastify !== 'undefined') {
             const toast = Toastify({
                 text: message,
-                duration: 3600,
-                gravity: "top",
-                position: "right",
+                duration: 3000,
+                gravity: 'top',
+                position: window.matchMedia('(max-width: 560px)').matches ? 'center' : 'right',
+                offset: { x: 12, y: 74 },
                 close: true,
                 closeOnClick: true,
                 stopOnFocus: false,
@@ -378,6 +394,12 @@ const app = {
                 onClick: () => toast.hideToast()
             });
             toast.showToast();
+            const node = toast.toastElement;
+            if (node) {
+                const dismiss = () => toast.hideToast();
+                node.addEventListener('click', dismiss, { passive: true });
+                node.addEventListener('touchend', dismiss, { passive: true });
+            }
         } else {
             alert(message);
         }
@@ -760,7 +782,7 @@ const app = {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
 
-        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ id, ...data }));
+        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ ...data, id }));
         const filtered = this.filterLogic(pages);
         const sorted = this.sortLogic(filtered);
 
@@ -869,7 +891,7 @@ const app = {
     async renderAdminList() {
         if (!this.currentUser || !this.db) return;
         const list = document.getElementById('admin-list');
-        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ id, ...data }));
+        const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ ...data, id }));
         const sorted = pages.sort((a, b) => new Date(b.updated || b.created || 0) - new Date(a.updated || a.created || 0));
         const scriptTotal = sorted.reduce((sum, page) => sum + Object.keys(page.scripts || {}).length, 0);
 
@@ -911,20 +933,23 @@ const app = {
                         <span class="text-muted">Updated ${updated}</span>
                     </div>
                 </div>
-                <div class="admin-item-right">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                <div class="admin-item-actions">
+                    <button type="button" class="admin-delete-btn" title="Delete page" aria-label="Delete page" onclick="event.stopPropagation(); app.deletePageConfirmation('${String(page.id)}')">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16"></path><path d="M10 11v6M14 11v6"></path><path d="M6 7l1 13h10l1-13"></path><path d="M9 7V4h6v3"></path></svg>
+                    </button>
+                    <span class="admin-item-arrow" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </span>
                 </div>
-                <div class="swipe-hint">Swipe to delete</div>
             </div>`;
         }).join('');
 
-        this.initSwipeToDelete();
     },
 
     renderBotsList() {
         if (!this.currentUser || !this.db) return;
         const list = document.getElementById('bots-list');
-        const bots = Object.entries(this.db.bots || {}).map(([id, data]) => ({ id, ...data }));
+        const bots = Object.entries(this.db.bots || {}).map(([id, data]) => ({ ...data, id }));
         const sorted = bots.sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0));
 
         const botCount = document.getElementById('admin-bot-count');
@@ -956,13 +981,16 @@ const app = {
                     <p class="admin-description">${utils.escapeHtml((b.message || '').substring(0, 150))}${(b.message || '').length > 150 ? '...' : ''}</p>
                     <div class="admin-meta"><span>${timeInfo}</span></div>
                 </div>
-                <div class="admin-item-right">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                <div class="admin-item-actions">
+                    <button type="button" class="admin-delete-btn" title="Cancel bot" aria-label="Cancel bot" onclick="event.stopPropagation(); app.deleteBotConfirmation('${String(b.id)}')">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+                    </button>
+                    <span class="admin-item-arrow" aria-hidden="true">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+                    </span>
                 </div>
-                <div class="swipe-hint">Swipe to cancel</div>
             </div>`;
         }).join('');
-        this.initSwipeToDelete();
     },
 
     initSwipeToDelete() {
@@ -1022,13 +1050,18 @@ const app = {
     },
 
     async deletePageConfirmation(pageId) {
-        if (!pageId || !this.db?.pages?.[pageId]) {
-            this.showToast('Page not found.', 'error');
+        const pageKeys = Object.keys(this.db?.pages || {});
+        const resolvedPageId = pageKeys.includes(pageId)
+            ? pageId
+            : pageKeys.find(key => this.db.pages[key]?.id === pageId);
+
+        if (!resolvedPageId) {
+            this.showToast('Page not found. Refreshing the workspace.', 'error');
             await this.loadDatabase();
             return;
         }
 
-        const page = this.db.pages[pageId];
+        const page = this.db.pages[resolvedPageId];
         let shouldDelete = false;
         if (typeof Swal !== 'undefined') {
             const result = await Swal.fire({
@@ -1045,7 +1078,7 @@ const app = {
             shouldDelete = confirm(`Delete "${page.title}" and all of its scripts?`);
         }
 
-        if (shouldDelete) await this.deletePageLogic(pageId);
+        if (shouldDelete) await this.deletePageLogic(resolvedPageId);
         else await this.loadDatabase();
     },
 
@@ -1083,7 +1116,6 @@ const app = {
             if (!page) throw new Error('Page not found');
 
             this.dbSha = await this.getRemoteDatabaseSha();
-            await this.deletePageFiles(pageId, page);
 
             const nextDb = JSON.parse(JSON.stringify(this.db));
             delete nextDb.pages[pageId];
@@ -1123,13 +1155,21 @@ const app = {
                 console.warn('Could not persist local database cache:', storageError);
             }
 
+            let cleanupWarning = false;
+            try {
+                await this.deletePageFiles(pageId, page);
+            } catch (cleanupError) {
+                cleanupWarning = true;
+                console.warn('Page file cleanup failed after database deletion:', cleanupError);
+            }
+
             if (this.currentEditingId === pageId) {
                 this.currentEditingId = null;
                 this.originalPageId = null;
                 this.originalTitle = null;
             }
 
-            this.showToast('Page deleted.', 'success');
+            this.showToast(cleanupWarning ? 'Page deleted. Some old files could not be removed automatically.' : 'Page deleted.', cleanupWarning ? 'warning' : 'success');
             this.renderAdminStats();
             this.switchAdminTab('list');
             this.renderList();
@@ -1743,7 +1783,7 @@ const app = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${utils.escapeHtml(pageData.title)} - CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/png" href="../../assets/favicon.ico">
-    <link rel="stylesheet" href="../../style.css">
+    <link rel="stylesheet" href="../../style.css?v=20260925-admin-v2">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>

@@ -1877,3 +1877,239 @@ body {
         justify-content: flex-end;
     }
 }
+
+
+/* ===== Mobile viewport and admin action hardening ===== */
+.modern-admin-item {
+    grid-template-columns: 42px minmax(0, 1fr) auto;
+}
+
+html {
+    min-height: 100%;
+    overflow-x: hidden;
+}
+
+body {
+    overflow-x: hidden;
+    width: 100%;
+    min-width: 0;
+}
+
+.cihuy-toast {
+    box-sizing: border-box !important;
+    width: min(380px, calc(100vw - 24px)) !important;
+    min-width: 0 !important;
+    max-width: calc(100vw - 24px) !important;
+    touch-action: manipulation;
+}
+
+.admin-item-actions {
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    min-width: 68px;
+}
+
+.admin-delete-btn {
+    width: 40px;
+    height: 40px;
+    display: grid;
+    place-items: center;
+    border: 1px solid rgba(255, 84, 84, .16);
+    border-radius: 11px;
+    background: rgba(255, 59, 59, .06);
+    color: #c68c92;
+    cursor: pointer;
+    transition: border-color .18s ease, background .18s ease, color .18s ease, transform .18s ease;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.admin-delete-btn:hover,
+.admin-delete-btn:focus-visible {
+    color: #fff;
+    border-color: rgba(255, 90, 90, .42);
+    background: rgba(255, 59, 59, .13);
+    transform: translateY(-1px);
+}
+
+.admin-delete-btn:active {
+    transform: scale(.96);
+}
+
+.admin-item-arrow {
+    display: grid;
+    place-items: center;
+    color: #856f74;
+}
+
+@media (max-width: 760px) {
+    .container {
+        width: 100%;
+        max-width: 100%;
+        margin-top: 72px;
+        margin-bottom: calc(24px + env(safe-area-inset-bottom));
+        padding-left: 12px;
+        padding-right: 12px;
+    }
+
+    #view-admin {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .admin-topbar {
+        width: 100%;
+        margin-top: 0 !important;
+        padding: 8px 4px 14px;
+        gap: 10px;
+    }
+
+    .admin-topbar-left,
+    .admin-topbar-actions {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .admin-topbar-left {
+        width: 100%;
+    }
+
+    .admin-topbar-actions {
+        width: 100%;
+    }
+
+    .btn-back,
+    .admin-topbar-actions .btn {
+        min-height: 42px;
+    }
+
+    .admin-panel {
+        width: 100%;
+        max-width: 100%;
+        border-radius: 18px;
+    }
+
+    .admin-hero,
+    .admin-stats,
+    .admin-editor,
+    .bot-form-container {
+        padding-left: 16px !important;
+        padding-right: 16px !important;
+    }
+
+    .admin-hero h1 {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-hero p {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    .admin-nav-row {
+        width: auto;
+        margin-left: 16px;
+        margin-right: 16px;
+    }
+
+    .admin-tab-switcher {
+        max-width: 100%;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        scrollbar-width: none;
+    }
+
+    .admin-tab-switcher::-webkit-scrollbar {
+        display: none;
+    }
+
+    .modern-list-header,
+    #admin-list,
+    #bots-list {
+        max-width: 100%;
+    }
+
+    .modern-admin-item {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: 34px minmax(0, 1fr) auto;
+        padding: 14px !important;
+        gap: 9px;
+    }
+
+    .admin-item-left {
+        min-width: 0;
+    }
+
+    .admin-item-title-row strong {
+        max-width: 100%;
+    }
+
+    .admin-script-chips {
+        max-width: 100%;
+        overflow: hidden;
+    }
+
+    .admin-delete-btn {
+        width: 42px;
+        height: 42px;
+    }
+
+    .admin-item-actions {
+        min-width: 64px;
+        gap: 4px;
+    }
+
+    .swipe-hint {
+        display: none !important;
+    }
+}
+
+@media (max-width: 420px) {
+    .nav-content {
+        padding-left: 10px;
+        padding-right: 10px;
+        gap: 6px;
+    }
+
+    .nav-center {
+        min-width: 0;
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    .nav-title {
+        font-size: 14px;
+    }
+
+    .admin-hero h1 {
+        font-size: 27px;
+    }
+
+    .admin-user-card {
+        width: 100%;
+    }
+
+    .modern-admin-item {
+        grid-template-columns: 32px minmax(0, 1fr) auto;
+        gap: 8px;
+        padding: 12px !important;
+    }
+
+    .admin-item-icon {
+        width: 32px;
+        height: 32px;
+    }
+
+    .admin-item-actions {
+        min-width: 42px;
+    }
+
+    .admin-item-arrow {
+        display: none;
+    }
+}
