@@ -1,15 +1,4 @@
 {
-  "scripts": {
-    "Example Script": {
-      "title": "Example Script",
-      "displayTitle": "Example Script",
-      "visibility": "PUBLIC",
-      "description": "Starter template. Edit this script or delete it, then use Manage → Add New to create your own script.",
-      "filename": "example-script.lua",
-      "size": 25,
-      "created": "2026-09-25T09:38:42.190Z",
-      "updated": "2026-09-25T09:38:42.191Z"
-    }
-  },
+  "scripts": {},
   "bots": {}
 }
