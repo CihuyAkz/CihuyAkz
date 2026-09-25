@@ -1,0 +1,148 @@
+name: Extract ZIP and Flatten
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Find ZIP
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Tidak ada file ZIP."
+            exit 1
+          fi
+
+          echo "ZIP ditemukan: $ZIP_FILE"
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Extract ZIP
+        shell: bash
+        run: |
+          set -e
+
+          rm -rf /tmp/extracted
+          mkdir -p /tmp/extracted
+
+          unzip -q "$ZIP_FILE" -d /tmp/extracted
+
+          echo "ZIP berhasil diekstrak."
+
+      - name: Flatten folders
+        shell: bash
+        run: |
+          set -e
+
+          CURRENT="/tmp/extracted"
+
+          while true; do
+            entries=()
+
+            while IFS= read -r -d '' item; do
+              entries+=("$item")
+            done < <(
+              find "$CURRENT" \
+                -mindepth 1 \
+                -maxdepth 1 \
+                ! -name ".github" \
+                -print0
+            )
+
+            if [ "${#entries[@]}" -ne 1 ]; then
+              break
+            fi
+
+            item="${entries[0]}"
+
+            if [ ! -d "$item" ]; then
+              break
+            fi
+
+            echo "Masuk ke folder: $item"
+            CURRENT="$item"
+          done
+
+          echo "Root hasil ekstraksi: $CURRENT"
+
+          rm -rf /tmp/final
+          mkdir -p /tmp/final
+
+          cp -a "$CURRENT"/. /tmp/final/
+
+      - name: Remove old repository files
+        shell: bash
+        run: |
+          set -e
+
+          # Hapus semua isi repository
+          # kecuali .git dan .github
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name ".git" \
+            ! -name ".github" \
+            -exec rm -rf {} +
+
+          echo "File lama sudah dihapus."
+
+      - name: Copy extracted files
+        shell: bash
+        run: |
+          set -e
+
+          # Hapus .github dari hasil ZIP agar workflow
+          # dari ZIP tidak ikut terbawa
+          rm -rf /tmp/final/.github
+
+          # Salin hasil ekstraksi ke root
+          cp -a /tmp/final/. .
+
+          # Pastikan SEMUA ZIP hasil ekstraksi juga dihapus
+          find . -type f \
+            \( -iname "*.zip" -o -iname "*.ZIP" \) \
+            -delete
+
+          echo "Hasil akhir:"
+          find . -maxdepth 3 -type f \
+            ! -path "./.git/*" \
+            | sort
+
+      - name: Remove source ZIP
+        shell: bash
+        run: |
+          set -e
+
+          # Pastikan ZIP sumber tidak ikut commit
+          rm -f "$ZIP_FILE"
+
+          echo "Source ZIP dihapus: $ZIP_FILE"
+
+      - name: Commit and Push
+        shell: bash
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan."
+            exit 0
+          fi
+
+          git commit -m "Extract ZIP and flatten"
+
+          git push origin HEAD:main
