@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-thumbnail-v1">
+    <link rel="stylesheet" href="style.css?v=20260925-red-v3">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -194,48 +194,38 @@
                             </div>
                         </div>
 
-                        <div class="thumbnail-editor-section">
-                            <div class="thumbnail-editor-heading">
-                                <div>
-                                    <label>Thumbnail <span class="optional-label">Optional</span></label>
-                                    <p class="field-help">Enter an image URL. The thumbnail appears only while interacting with the script card.</p>
+                        <div class="form-row thumbnail-editor-row">
+                            <div class="form-group form-group-flex">
+                                <div class="thumbnail-label-row">
+                                    <label for="edit-thumbnail">Thumbnail <span class="optional-label">Optional</span></label>
+                                    <label class="thumbnail-toggle" for="edit-thumbnail-enabled">
+                                        <input type="checkbox" id="edit-thumbnail-enabled" checked onchange="app.updateThumbnailPreview()">
+                                        <span>Enabled</span>
+                                    </label>
                                 </div>
-                                <button type="button" class="btn btn-secondary btn-sm" onclick="app.resetThumbnailEditor()">Reset Crop</button>
+                                <input type="text" id="edit-thumbnail" class="input-field" placeholder="https://example.com/thumbnail.jpg or assets/example-thumbnail.jpg" autocomplete="off" oninput="app.updateThumbnailPreview()">
+                                <small class="form-hint">Shown only while a script card is hovered, focused, or pressed. Leave the URL empty or switch off "Enabled" to turn it off.</small>
+
+                                <div class="thumbnail-adjust-row">
+                                    <div class="thumbnail-adjust-item">
+                                        <label for="edit-thumbnail-scale">Zoom <span id="edit-thumbnail-scale-value" class="thumbnail-adjust-value">100%</span></label>
+                                        <input type="range" id="edit-thumbnail-scale" min="100" max="300" step="5" value="100" oninput="app.updateThumbnailPreview()">
+                                    </div>
+                                    <div class="thumbnail-adjust-item">
+                                        <label for="edit-thumbnail-pos-x">Horizontal Position <span id="edit-thumbnail-pos-x-value" class="thumbnail-adjust-value">50%</span></label>
+                                        <input type="range" id="edit-thumbnail-pos-x" min="0" max="100" step="1" value="50" oninput="app.updateThumbnailPreview()">
+                                    </div>
+                                    <div class="thumbnail-adjust-item">
+                                        <label for="edit-thumbnail-pos-y">Vertical Position <span id="edit-thumbnail-pos-y-value" class="thumbnail-adjust-value">50%</span></label>
+                                        <input type="range" id="edit-thumbnail-pos-y" min="0" max="100" step="1" value="50" oninput="app.updateThumbnailPreview()">
+                                    </div>
+                                    <button type="button" class="btn btn-secondary btn-sm thumbnail-reset-btn" onclick="app.resetThumbnailAdjust()">Reset zoom &amp; position</button>
+                                </div>
+                                <small class="form-hint">The image always fills the card at 100% zoom, so there is never a black bar. Zooming in only crops further into the image; drag the sliders to pick exactly what shows.</small>
                             </div>
-                            <input type="text" id="edit-thumbnail" class="input-field" placeholder="https://example.com/thumbnail.jpg" autocomplete="off">
-                            <div class="thumbnail-editor-grid">
-                                <div class="thumbnail-preview-panel">
-                                    <div class="thumbnail-preview-label">Live Preview</div>
-                                    <div id="thumbnail-preview" class="thumbnail-preview" aria-label="Thumbnail preview">
-                                        <div class="thumbnail-preview-empty">
-                                            <span>No thumbnail selected</span>
-                                            <small>Paste an image URL above</small>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="thumbnail-controls">
-                                    <div class="thumbnail-control">
-                                        <div class="control-label-row">
-                                            <label for="edit-thumbnail-scale">Scale</label>
-                                            <output id="thumbnail-scale-value">1.00×</output>
-                                        </div>
-                                        <input type="range" id="edit-thumbnail-scale" min="1" max="3" step="0.01" value="1">
-                                    </div>
-                                    <div class="thumbnail-control">
-                                        <div class="control-label-row">
-                                            <label for="edit-thumbnail-x">Horizontal Position</label>
-                                            <output id="thumbnail-x-value">50%</output>
-                                        </div>
-                                        <input type="range" id="edit-thumbnail-x" min="0" max="100" step="1" value="50">
-                                    </div>
-                                    <div class="thumbnail-control">
-                                        <div class="control-label-row">
-                                            <label for="edit-thumbnail-y">Vertical Position</label>
-                                            <output id="thumbnail-y-value">50%</output>
-                                        </div>
-                                        <input type="range" id="edit-thumbnail-y" min="0" max="100" step="1" value="50">
-                                    </div>
-                                    <p class="field-help thumbnail-crop-note">The image always fills the card frame. Extra image area is cropped to prevent black bars.</p>
+                            <div class="thumbnail-preview-wrap">
+                                <div id="thumbnail-preview" class="thumbnail-preview" aria-hidden="true">
+                                    <span>No thumbnail</span>
                                 </div>
                             </div>
                         </div>
@@ -330,6 +320,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/lua/lua.min.js"></script>
-    <script src="app.js?v=20260924-red"></script>
+    <script src="app.js?v=20260925-thumbnail-hover"></script>
     <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "468b54ebf85b4f809e3ba2eda2d74612"}'></script></body>
 </html>

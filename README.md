@@ -1,26 +1,19 @@
 # CihuyAkz Studio Lite
 
-A lightweight website for storing, browsing, and managing Roblox Studio Lite / Roblox Studio scripts.
+A lightweight website for storing and managing Roblox Studio Lite / Roblox Studio scripts.
 
-## Features
+- Theme: red gradient
+- Built-in script: `Example Script`
+- New scripts can be added from `Manage` → `Add New`
+- Script cards support optional hover thumbnails with a red gradient overlay
+- Thumbnail fields are optional and can use a direct image URL or a relative image path
+- The bundled `Example Script` uses the supplied illustration as its sample thumbnail
+- Web icon: CihuyAkz YouTube icon
 
-- Red gradient interface.
-- Built-in `Example Script`.
-- Script creation and editing from `Manage` → `Add New`.
-- Optional script thumbnails with a live crop preview.
-- Precise thumbnail horizontal and vertical positioning.
-- Thumbnail scale control from `1.00×` to `3.00×`.
-- Thumbnails appear only while hovering or keyboard-focusing a script card.
-- Thumbnail images use a cropped cover frame, so oversized images are clipped instead of creating black bars.
-- GitHub-based publishing for script and database changes.
+### Lite Version Notes
+- The public script library loads `database.json` locally first so removed remote scripts do not reappear.
+- The built-in script is `Example Script`.
+- The interface uses a red gradient theme.
+- The favicon uses the CihuyAkz YouTube icon.
+- `Manage` → `Add New` remains available; after GitHub login, script changes are also pushed to the configured repository.
 - Login is restricted to the configured GitHub account; a GitHub token is required for Manage/Publish operations.
-
-## Thumbnail Editing
-
-The `Thumbnail` field is optional. Enter an HTTP/HTTPS image URL, then use the live preview to adjust:
-
-- `Scale` — controls image zoom.
-- `Horizontal Position` — moves the visible crop left/right.
-- `Vertical Position` — moves the visible crop up/down.
-
-The thumbnail viewport always matches the card frame and uses `object-fit: cover` with overflow clipping to keep the presentation filled.
