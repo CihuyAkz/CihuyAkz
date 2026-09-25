@@ -1,0 +1,92 @@
+name: Extract ZIP and Flatten
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Extract ZIP
+        shell: bash
+        run: |
+          set -e
+
+          ZIP_FILE=$(find . -maxdepth 1 -type f -iname "*.zip" -print -quit)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "ERROR: Tidak ada ZIP di root repository."
+            exit 1
+          fi
+
+          echo "ZIP ditemukan: $ZIP_FILE"
+
+          rm -rf /tmp/extracted
+          mkdir -p /tmp/extracted
+
+          unzip -q "$ZIP_FILE" -d /tmp/extracted
+
+          CURRENT="/tmp/extracted"
+
+          # Masuk otomatis ke folder tunggal
+          while true; do
+            mapfile -d '' ITEMS < <(
+              find "$CURRENT" -mindepth 1 -maxdepth 1 -print0
+            )
+
+            if [ "${#ITEMS[@]}" -ne 1 ]; then
+              break
+            fi
+
+            ITEM="${ITEMS[0]%$'\0'}"
+
+            if [ ! -d "$ITEM" ]; then
+              break
+            fi
+
+            echo "Folder pembungkus ditemukan: $ITEM"
+            CURRENT="$ITEM"
+          done
+
+          echo "Root hasil ekstraksi: $CURRENT"
+
+          # Hapus semua isi repository kecuali .git
+          find . -mindepth 1 -maxdepth 1 \
+            ! -name ".git" \
+            -exec rm -rf {} +
+
+          # Pindahkan isi ZIP ke root
+          cp -a "$CURRENT"/. .
+
+          # Hapus workflow yang ikut terbawa dari ZIP
+          rm -rf .github
+
+          echo "Hasil akhir:"
+          find . -maxdepth 3 -type f \
+            ! -path "./.git/*" \
+            | sort
+
+      - name: Commit and Push
+        shell: bash
+        run: |
+          set -e
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "Tidak ada perubahan."
+            exit 0
+          fi
+
+          git commit -m "Extract ZIP"
+          git push origin HEAD:main
