@@ -10,7 +10,7 @@
       const repoSegment = location.hostname.endsWith('.github.io') ? (parts[0] || '') : '';
       const base = repoSegment ? location.origin + '/' + encodeURIComponent(repoSegment) + '/' : location.origin + '/';
       document.write('<link rel="icon" type="image/png" href="' + base + 'assets/favicon.ico">');
-      document.write('<link rel="stylesheet" href="' + base + 'style.css?v=20260925-404-fallback">');
+      document.write('<link rel="stylesheet" href="' + base + 'style.css?v=20260925-404-fallback-v2">');
     })();
   </script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
@@ -29,7 +29,7 @@
   </nav>
   <main class="container script-page-container">
     <section id="script-content" class="script-page-content">
-      <div class="script-header-lg page-hero-header"><div><span class="page-kicker">PAGE</span><h1 id="page-title">Loading...</h1><div class="meta-row"><span class="meta-badge" id="script-count">Loading...</span><span class="meta-badge" id="page-date"></span></div></div></div>
+      <div class="script-header-lg page-hero-header"><div><h1 id="page-title">Loading...</h1><div class="meta-row"><span class="meta-badge" id="script-count">Loading...</span><span class="meta-badge" id="page-date"></span></div></div></div>
       <p class="script-description" id="page-description"></p>
       <div id="page-script-tabs" class="page-script-tabs"></div>
       <div id="page-script-panels" class="page-script-panels"></div>

@@ -647,7 +647,7 @@ const app = {
             return false;
         } catch (error) {
             bot.isProcessing = false;
-            this.showToast(`Terjadi kesalahan: ${error.message}`, 'error');
+            this.showToast(`An error occurred: ${error.message}`, 'error');
             return false;
         }
     },
@@ -773,7 +773,6 @@ const app = {
                 <div class="card-content">
                     <div class="card-header-section">
                         <div>
-                            <span class="page-kicker">PAGE</span>
                             <h3 class="script-title">${utils.escapeHtml(page.title)}</h3>
                         </div>
                         ${page.visibility !== 'PUBLIC' ? `<span class="badge badge-${page.visibility.toLowerCase()}">${page.visibility}</span>` : ''}
@@ -1559,7 +1558,7 @@ const app = {
         const status = document.getElementById('page-editor-status');
         if (heading) heading.textContent = `Edit: ${page.title}`;
         if (saveBtn) saveBtn.textContent = 'Update Page';
-        if (status) status.textContent = 'Mengedit';
+        if (status) status.textContent = 'Editing';
         document.getElementById('edit-title').value = page.title || '';
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
         document.getElementById('edit-desc').value = page.description || '';
@@ -1823,7 +1822,7 @@ const app = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${escapedTitle} - CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/png" href="${CONFIG.pageUrl('assets/favicon.ico')}">
-    <link rel="stylesheet" href="${CONFIG.pageUrl('style.css?v=20260925-page-builder')}">
+    <link rel="stylesheet" href="${CONFIG.pageUrl('style.css?v=20260925-page-builder-v2')}">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
@@ -1846,7 +1845,6 @@ const app = {
         <section id="script-content" class="script-page-content">
             <div class="script-header-lg page-hero-header">
                 <div>
-                    <span class="page-kicker">SCRIPT PAGE</span>
                     <h1>${escapedTitle}</h1>
                     <div class="meta-row">
                         <span class="meta-badge">${(page.scripts || []).length} scripts</span>
