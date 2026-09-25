@@ -46,6 +46,34 @@ const utils = {
         return div.innerHTML;
     },
 
+    sanitizeThumbnailUrl(value) {
+        const raw = String(value || '').trim();
+        if (!raw) return '';
+        const lower = raw.toLowerCase();
+        if (lower.startsWith('javascript:') || lower.startsWith('vbscript:')) return '';
+        try {
+            const url = new URL(raw, window.location.href);
+            if (!['http:', 'https:'].includes(url.protocol)) return '';
+            return raw;
+        } catch (e) {
+            return '';
+        }
+    },
+
+    getThumbnailSettings(script) {
+        const raw = script && script.thumbnail;
+        if (!raw) return null;
+        const data = typeof raw === 'string' ? { url: raw } : raw;
+        const url = this.sanitizeThumbnailUrl(data && data.url);
+        if (!url) return null;
+        return {
+            url,
+            scale: Math.min(3, Math.max(1, Number(data.scale) || 1)),
+            x: Math.min(100, Math.max(0, Number(data.x) || 50)),
+            y: Math.min(100, Math.max(0, Number(data.y) || 50))
+        };
+    },
+
     validateTitle(title) {
         if (!title || title.trim().length === 0) return 'Title is required';
         if (title.length > 100) return 'Title must be less than 100 characters';
@@ -62,18 +90,6 @@ const utils = {
         if (!code || code.trim().length === 0) return 'Code is required';
         if (code.length > 100000) return 'Code is too large (max 100KB)';
         return null;
-    },
-
-    validateThumbnail(thumbnail) {
-        if (!thumbnail) return null;
-        if (thumbnail.length > 1200) return 'Thumbnail URL is too long';
-        if (/^data:/i.test(thumbnail) || /^javascript:/i.test(thumbnail)) {
-            return 'Thumbnail must use a normal image URL or a relative image path';
-        }
-        if (/^https?:\/\//i.test(thumbnail) || /^(?:\.\.?\/|\/|assets\/|scripts\/)/i.test(thumbnail)) {
-            return null;
-        }
-        return 'Thumbnail must use https://, http://, or a relative image path';
     },
     
     formatDisplayTime(isoString, timezone) {
@@ -158,8 +174,93 @@ const app = {
                 this.debouncedRender();
             });
         }
+        this.initThumbnailEditor();
     },
-    
+
+    initThumbnailEditor() {
+        const input = document.getElementById('edit-thumbnail');
+        const scale = document.getElementById('edit-thumbnail-scale');
+        const x = document.getElementById('edit-thumbnail-x');
+        const y = document.getElementById('edit-thumbnail-y');
+        if (!input || !scale || !x || !y || input.dataset.initialized === 'true') return;
+        const update = () => this.updateThumbnailPreview();
+        input.addEventListener('input', update);
+        scale.addEventListener('input', update);
+        x.addEventListener('input', update);
+        y.addEventListener('input', update);
+        input.dataset.initialized = 'true';
+        this.updateThumbnailPreview();
+    },
+
+    updateThumbnailPreview() {
+        const preview = document.getElementById('thumbnail-preview');
+        const input = document.getElementById('edit-thumbnail');
+        const scale = document.getElementById('edit-thumbnail-scale');
+        const x = document.getElementById('edit-thumbnail-x');
+        const y = document.getElementById('edit-thumbnail-y');
+        const scaleOutput = document.getElementById('thumbnail-scale-value');
+        const xOutput = document.getElementById('thumbnail-x-value');
+        const yOutput = document.getElementById('thumbnail-y-value');
+        if (!preview || !input || !scale || !x || !y) return;
+
+        const url = utils.sanitizeThumbnailUrl(input.value);
+        const scaleValue = Math.min(3, Math.max(1, Number(scale.value) || 1));
+        const xValue = Math.min(100, Math.max(0, Number(x.value) || 50));
+        const yValue = Math.min(100, Math.max(0, Number(y.value) || 50));
+        if (scaleOutput) scaleOutput.textContent = `${scaleValue.toFixed(2)}×`;
+        if (xOutput) xOutput.textContent = `${Math.round(xValue)}%`;
+        if (yOutput) yOutput.textContent = `${Math.round(yValue)}%`;
+
+        preview.innerHTML = '';
+        if (!url) {
+            preview.innerHTML = `<div class="thumbnail-preview-empty"><span>No thumbnail selected</span><small>Paste an image URL above</small></div>`;
+            preview.classList.remove('has-image');
+            return;
+        }
+
+        preview.classList.add('has-image');
+        const img = document.createElement('img');
+        img.className = 'thumbnail-preview-image';
+        img.src = url;
+        img.alt = 'Thumbnail preview';
+        img.style.objectPosition = `${xValue}% ${yValue}%`;
+        img.style.transform = `scale(${scaleValue})`;
+        img.addEventListener('error', () => {
+            preview.classList.remove('has-image');
+            preview.innerHTML = `<div class="thumbnail-preview-empty thumbnail-preview-error"><span>Unable to load thumbnail</span><small>Check the image URL and try again</small></div>`;
+        }, { once: true });
+        const overlay = document.createElement('div');
+        overlay.className = 'thumbnail-preview-overlay';
+        overlay.innerHTML = '<span>Hover preview</span>';
+        preview.appendChild(img);
+        preview.appendChild(overlay);
+    },
+
+    resetThumbnailEditor() {
+        const input = document.getElementById('edit-thumbnail');
+        const scale = document.getElementById('edit-thumbnail-scale');
+        const x = document.getElementById('edit-thumbnail-x');
+        const y = document.getElementById('edit-thumbnail-y');
+        if (input) input.value = '';
+        if (scale) scale.value = '1';
+        if (x) x.value = '50';
+        if (y) y.value = '50';
+        this.updateThumbnailPreview();
+    },
+
+    loadThumbnailEditor(script) {
+        const settings = utils.getThumbnailSettings(script) || { url: '', scale: 1, x: 50, y: 50 };
+        const input = document.getElementById('edit-thumbnail');
+        const scale = document.getElementById('edit-thumbnail-scale');
+        const x = document.getElementById('edit-thumbnail-x');
+        const y = document.getElementById('edit-thumbnail-y');
+        if (input) input.value = settings.url;
+        if (scale) scale.value = settings.scale;
+        if (x) x.value = settings.x;
+        if (y) y.value = settings.y;
+        this.updateThumbnailPreview();
+    },
+
     initCodeMirror() {
         if (window.cmEditor) return;
         const textarea = document.getElementById('edit-code');
@@ -328,7 +429,7 @@ const app = {
             
             const user = await res.json();
             if (user.login.toLowerCase() !== CONFIG.allowedUser.toLowerCase()) {
-                throw new Error(`Only the GitHub account ${CONFIG.allowedUser} can manage this site. This token belongs to ${user.login}.`);
+                throw new Error(`Akses hanya untuk akun GitHub ${CONFIG.allowedUser}. Token ini milik ${user.login}.`);
             }
             
             this.currentUser = user;
@@ -346,17 +447,6 @@ const app = {
         }
     },
 
-    normalizeDatabase() {
-        if (!this.db || typeof this.db !== 'object') this.db = {};
-        if (!this.db.scripts || typeof this.db.scripts !== 'object') this.db.scripts = {};
-        if (!this.db.bots || typeof this.db.bots !== 'object') this.db.bots = {};
-
-        const example = this.db.scripts['Example Script'];
-        if (example && typeof example.thumbnail === 'undefined') {
-            example.thumbnail = 'assets/example-thumbnail.jpg';
-        }
-    },
-
     async loadDatabase() {
         try {
             this.isLoading = true;
@@ -371,7 +461,8 @@ const app = {
             const localSaved = localStorage.getItem('cihuyakz_local_db_v2');
             if (localSaved) {
                 this.db = JSON.parse(localSaved);
-                this.normalizeDatabase();
+                if (!this.db.scripts) this.db.scripts = {};
+                if (!this.db.bots) this.db.bots = {};
                 this.renderList();
                 this.renderAdminList();
                 return;
@@ -384,7 +475,8 @@ const app = {
             if (!localRes.ok) throw new Error(`Failed to load bundled database: ${localRes.status}`);
 
             this.db = await localRes.json();
-            this.normalizeDatabase();
+            if (!this.db.scripts) this.db.scripts = {};
+            if (!this.db.bots) this.db.bots = {};
             try {
                 localStorage.setItem('cihuyakz_local_db_v2', JSON.stringify(this.db));
             } catch (storageError) {
@@ -654,39 +746,32 @@ const app = {
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
-        
         const scripts = Object.entries(this.db.scripts || {}).map(([title, data]) => ({ title, ...data }));
         const filtered = this.filterLogic(scripts);
         const sorted = this.sortLogic(filtered);
-        
         if (sorted.length === 0) {
-            list.innerHTML = `<div class="empty-state">
-                <h2>No scripts found</h2>
-                <p>Try adjusting your search or filter</p>
-            </div>`;
+            list.innerHTML = `<div class="empty-state"><h2>No scripts found</h2><p>Try adjusting your search or filter</p></div>`;
             return;
         }
-        
         list.innerHTML = sorted.map(s => {
             const scriptId = utils.sanitizeTitle(s.title);
-            const safeTitle = utils.escapeHtml(s.title);
-            const thumbnail = typeof s.thumbnail === 'string' ? s.thumbnail.trim() : '';
-            const safeThumbnail = thumbnail ? utils.escapeHtml(thumbnail) : '';
-            return `<div class="script-card${thumbnail ? ' has-thumbnail' : ''}" tabindex="0" role="link" aria-label="Open ${safeTitle}" onclick="window.location.href='scripts/${scriptId}/index.html'" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
-                ${thumbnail ? `<div class="script-card-media" aria-hidden="true">
-                    <div class="script-card-media-gradient"></div>
-                    <img src="${safeThumbnail}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.closest('.script-card').classList.add('thumbnail-error')">
-                </div>` : ''}
+            const thumb = utils.getThumbnailSettings(s);
+            const thumbnailMarkup = thumb ? `
+                <div class="script-thumbnail" aria-hidden="true" style="--thumbnail-x:${thumb.x}%;--thumbnail-y:${thumb.y}%;--thumbnail-scale:${thumb.scale};">
+                    <img src="${utils.escapeHtml(thumb.url)}" alt="" loading="lazy">
+                    <div class="script-thumbnail-gradient"></div>
+                </div>` : '';
+            return `<div class="script-card ${thumb ? 'has-thumbnail' : ''}" tabindex="0" onclick="window.location.href='scripts/${scriptId}/index.html'" onkeydown="if(event.key==='Enter' || event.key===' ') { event.preventDefault(); this.click(); }">
+                ${thumbnailMarkup}
                 <div class="card-content">
                     <div class="card-header-section">
-                        <h3 class="script-title">${safeTitle}</h3>
+                        <h3 class="script-title">${utils.escapeHtml(s.title)}</h3>
                         ${s.visibility !== 'PUBLIC' ? `<span class="badge badge-${s.visibility.toLowerCase()}">${s.visibility}</span>` : ''}
                     </div>
-                    ${s.description ? `<p class="script-card-description">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
-                    ${thumbnail ? `<span class="thumbnail-hint">Hover to preview thumbnail</span>` : ''}
+                    ${s.description ? `<p class="script-description">${utils.escapeHtml(s.description.substring(0, 150))}${s.description.length > 150 ? '...' : ''}</p>` : ''}
                     <div class="card-meta">
-                        <span>${new Date(s.created).toLocaleDateString()}</span>
-                        ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString()}</span>` : ''}
+                        <span>${new Date(s.created).toLocaleDateString('en-US')}</span>
+                        ${s.updated && s.updated !== s.created ? `<span title="Updated">↻ ${new Date(s.updated).toLocaleDateString('en-US')}</span>` : ''}
                     </div>
                 </div>
             </div>`;
@@ -778,13 +863,14 @@ const app = {
         }
         list.innerHTML = sorted.map(s => {
             const updated = s.updated ? new Date(s.updated).toLocaleDateString() : new Date(s.created).toLocaleDateString();
+            const hasThumbnail = !!utils.getThumbnailSettings(s);
             return `<div class="admin-item" data-script-title="${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}" onclick="app.populateEditor('${s.title.replace(/'/g, "\\'").replace(/"/g, '"')}')">
                 <div class="admin-item-left">
                     <strong>${utils.escapeHtml(s.title)}</strong>
                     <div class="admin-meta">
                         <span class="badge badge-sm badge-${s.visibility.toLowerCase()}">${s.visibility}</span>
+                        ${hasThumbnail ? '<span class="badge badge-sm badge-thumbnail">Thumbnail</span>' : ''}
                         <span class="text-muted">Updated ${updated}</span>
-                        ${s.thumbnail ? '<span class="thumbnail-admin-status">Thumbnail</span>' : ''}
                     </div>
                 </div>
                 <div class="admin-item-right">
@@ -1065,9 +1151,8 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = '';
-        const editThumbnail = document.getElementById('edit-thumbnail');
-        if (editThumbnail) editThumbnail.value = '';
-        this.updateThumbnailPreview();
+
+        this.resetThumbnailEditor();
         
         if (window.cmEditor) window.cmEditor.setValue('');
         
@@ -1110,23 +1195,6 @@ const app = {
         }
     },
 
-    updateThumbnailPreview() {
-        const input = document.getElementById('edit-thumbnail');
-        const preview = document.getElementById('thumbnail-preview');
-        if (!input || !preview) return;
-
-        const value = input.value.trim();
-        if (!value) {
-            preview.classList.remove('has-image');
-            preview.innerHTML = '<span>No thumbnail</span>';
-            return;
-        }
-
-        const safeValue = utils.escapeHtml(value);
-        preview.classList.add('has-image');
-        preview.innerHTML = `<div class="thumbnail-preview-glow"></div><img src="${safeValue}" alt="Thumbnail preview" onerror="this.closest('.thumbnail-preview').classList.add('preview-error')">`;
-    },
-
     async populateEditor(title) {
         if (!this.currentUser || !this.db || !this.db.scripts[title]) return;
         const s = this.db.scripts[title];
@@ -1143,9 +1211,8 @@ const app = {
         
         const editDesc = document.getElementById('edit-desc');
         if (editDesc) editDesc.value = s.description || '';
-        const editThumbnail = document.getElementById('edit-thumbnail');
-        if (editThumbnail) editThumbnail.value = s.thumbnail || '';
-        this.updateThumbnailPreview();
+
+        this.loadThumbnailEditor(s);
         
         try {
             if (typeof NProgress !== 'undefined') NProgress.start();
@@ -1231,7 +1298,6 @@ const app = {
         const titleInput = document.getElementById('edit-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
-        const thumbnailInput = document.getElementById('edit-thumbnail');
         const saveBtn = document.querySelector('.editor-actions .btn:last-child');
         
         if (!titleInput || !visibilityInput || !saveBtn) {
@@ -1244,15 +1310,13 @@ const app = {
         const visibility = visibilityInput.value;
         const code = window.cmEditor ? window.cmEditor.getValue() : '';
         const desc = descInput ? descInput.value.trim() : '';
-        const thumbnail = thumbnailInput ? thumbnailInput.value.trim() : '';
         const originalBtnText = saveBtn.textContent;
         
         const titleError = utils.validateTitle(title);
         const codeError = utils.validateCode(code);
-        const thumbnailError = utils.validateThumbnail(thumbnail);
         
-        if (titleError || codeError || thumbnailError) {
-            this.showToast(titleError || codeError || thumbnailError, 'error');
+        if (titleError || codeError) {
+            this.showToast(titleError || codeError, 'error');
             this.actionInProgress = false;
             return;
         }
@@ -1272,6 +1336,26 @@ const app = {
                 originalCreationDate = this.db.scripts[this.originalTitle].created;
             }
             
+            const thumbnailInput = document.getElementById('edit-thumbnail');
+            const thumbnailScale = document.getElementById('edit-thumbnail-scale');
+            const thumbnailX = document.getElementById('edit-thumbnail-x');
+            const thumbnailY = document.getElementById('edit-thumbnail-y');
+            const thumbnailUrl = thumbnailInput ? utils.sanitizeThumbnailUrl(thumbnailInput.value) : '';
+            if (thumbnailInput && thumbnailInput.value.trim() && !thumbnailUrl) {
+                this.showToast('Thumbnail URL must use HTTP or HTTPS.', 'error');
+                this.actionInProgress = false;
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalBtnText;
+                if (typeof NProgress !== 'undefined') NProgress.done();
+                return;
+            }
+            const thumbnail = thumbnailUrl ? {
+                url: thumbnailUrl,
+                scale: Math.min(3, Math.max(1, Number(thumbnailScale && thumbnailScale.value) || 1)),
+                x: Math.min(100, Math.max(0, Number(thumbnailX && thumbnailX.value) || 50)),
+                y: Math.min(100, Math.max(0, Number(thumbnailY && thumbnailY.value) || 50))
+            } : null;
+
             const scriptData = {
                 title: title,
                 displayTitle: title,
