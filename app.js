@@ -5,7 +5,7 @@ const CONFIG = {
     allowedUser: 'CihuyAkz',
     branch: 'main',
     cacheBuster: () => Date.now(),
-    localDbCacheVersion: '20260926-tags-search-v1',
+    localDbCacheVersion: '20260925-reset-mobile-v2',
 
     // GitHub Pages URL for this project fork.
     pagesBaseUrl() {
@@ -101,7 +101,6 @@ const app = {
     scriptDraftCounter: 0,
     isLoading: false,
     searchQuery: '',
-    currentTag: '',
     scheduledTimers: {},
     
     async init() {
@@ -132,6 +131,14 @@ const app = {
         this.startBotScheduler();
     },
 
+    animateEntry(element, className = 'route-enter') {
+        if (!element) return;
+        element.classList.remove(className);
+        // Force a layout pass so revisiting the same view/tab reliably replays the animation.
+        void element.offsetWidth;
+        element.classList.add(className);
+    },
+
     startSessionRefresh() {
         setInterval(() => {
             if (this.token && this.currentUser) {
@@ -150,46 +157,11 @@ const app = {
     
     initEventListeners() {
         const searchInput = document.getElementById('search');
-        const searchWrapper = document.getElementById('search-wrapper');
-        const searchCancel = document.getElementById('search-cancel');
-
-        const setSearchActive = (active) => {
-            searchWrapper?.classList.toggle('is-active', active);
-        };
-
         if (searchInput) {
-            searchInput.addEventListener('focus', () => setSearchActive(true));
             searchInput.addEventListener('input', (e) => {
                 this.searchQuery = e.target.value;
-                setSearchActive(true);
                 this.debouncedRender();
             });
-            searchInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Escape') {
-                    e.preventDefault();
-                    searchCancel?.click();
-                }
-            });
-            searchInput.addEventListener('blur', () => {
-                if (!searchInput.value.trim()) setSearchActive(false);
-            });
-        }
-
-        searchCancel?.addEventListener('click', () => {
-            if (!searchInput) return;
-            searchInput.value = '';
-            this.searchQuery = '';
-            this.currentTag = '';
-            document.querySelectorAll('.tag-filter').forEach(tag => tag.classList.remove('active'));
-            document.querySelector('.tag-filter[data-tag=""]')?.classList.add('active');
-            searchWrapper?.classList.remove('is-active');
-            searchInput.blur();
-            this.renderList();
-        });
-
-        const tagsInput = document.getElementById('edit-tags');
-        if (tagsInput) {
-            tagsInput.addEventListener('input', () => this.renderTagPreview(tagsInput.value));
         }
     },
     
@@ -300,7 +272,6 @@ const app = {
                     displayTitle: legacy.displayTitle || legacy.title || legacyTitle,
                     visibility: legacy.visibility || 'PUBLIC',
                     description: legacy.description || '',
-                    tags: this.normalizeTags(legacy.tags || []),
                     filename: legacy.filename || `${scriptId}.lua`,
                     created: legacy.created || new Date().toISOString(),
                     updated: legacy.updated || legacy.created || new Date().toISOString(),
@@ -330,7 +301,6 @@ const app = {
             page.displayTitle = page.displayTitle || page.title;
             page.visibility = page.visibility || 'PUBLIC';
             page.description = page.description || '';
-            page.tags = this.normalizeTags(page.tags || []);
             page.created = page.created || new Date().toISOString();
             page.updated = page.updated || page.created;
             if (!page.scripts || typeof page.scripts !== 'object') page.scripts = {};
@@ -816,68 +786,11 @@ const app = {
         }
     },
 
-    normalizeTags(input) {
-        const values = Array.isArray(input) ? input : String(input || '').split(',');
-        const seen = new Set();
-        return values
-            .map(tag => String(tag || '').trim().replace(/\s+/g, ' '))
-            .filter(Boolean)
-            .map(tag => tag.slice(0, 24))
-            .filter(tag => {
-                const key = tag.toLowerCase();
-                if (seen.has(key)) return false;
-                seen.add(key);
-                return true;
-            })
-            .slice(0, 8);
-    },
-
-    renderTagPreview(value) {
-        const preview = document.getElementById('edit-tags-preview');
-        if (!preview) return;
-        const tags = this.normalizeTags(value);
-        preview.innerHTML = tags.length
-            ? tags.map(tag => `<span class="tag-pill tag-pill-preview">#${utils.escapeHtml(tag)}</span>`).join('')
-            : '<span class="tag-preview-empty">Tags will appear here</span>';
-    },
-
-    renderTagFilters(pages) {
-        const container = document.getElementById('tag-filters');
-        if (!container) return;
-        const tags = [...new Map(
-            pages.flatMap(page => this.normalizeTags(page.tags || [])).map(tag => [tag.toLowerCase(), tag])
-        ).values()].sort((a, b) => a.localeCompare(b));
-        const active = this.currentTag.toLowerCase();
-        const all = `<button type="button" class="tag-filter ${active ? '' : 'active'}" data-tag="" onclick="app.filterTag('')">All tags</button>`;
-        if (!tags.length) {
-            container.innerHTML = all + '<span class="tag-filter-empty">Add tags to your pages to filter them here.</span>';
-            return;
-        }
-        container.innerHTML = all + tags.map(tag => {
-            const isActive = tag.toLowerCase() === active;
-            return `<button type="button" class="tag-filter ${isActive ? 'active' : ''}" data-tag="${utils.escapeHtml(tag.toLowerCase())}" onclick="app.filterTag(this.dataset.tag)">#${utils.escapeHtml(tag)}</button>`;
-        }).join('');
-    },
-
-    filterTag(tag) {
-        this.currentTag = String(tag || '');
-        const input = document.getElementById('search');
-        if (this.currentTag) {
-            input?.focus();
-            const currentQuery = this.searchQuery.trim();
-            if (!currentQuery) {
-                this.searchQuery = '';
-            }
-        }
-        this.renderList();
-    },
-
     renderList() {
         const list = document.getElementById('script-list');
         if (!list || !this.db) return;
 
         const pages = Object.entries(this.db.pages || {}).map(([id, data]) => ({ ...data, id }));
-        this.renderTagFilters(pages.filter(page => page.visibility === 'PUBLIC' || this.currentUser));
         const filtered = this.filterLogic(pages);
         const sorted = this.sortLogic(filtered);
 
@@ -894,8 +807,6 @@ const app = {
             const scriptNames = scripts.slice(0, 3).map(script => utils.escapeHtml(script.name)).join(', ');
             const moreCount = scripts.length > 3 ? ` +${scripts.length - 3} more` : '';
             const pageId = page.id || utils.sanitizeTitle(page.title);
-            const pageTags = this.normalizeTags(page.tags || []);
-            const tagsMarkup = pageTags.length ? `<div class="page-card-tags">${pageTags.map(tag => `<button type=\"button\" class=\"tag-pill\" data-tag=\"${utils.escapeHtml(tag)}\" onclick=\"event.stopPropagation(); app.filterTag(this.dataset.tag)\">#${utils.escapeHtml(tag)}</button>`).join('')}</div>` : '';
             return `<div class="script-card page-card" onclick="window.location.href='scripts/${encodeURIComponent(pageId)}/index.html'">
                 <div class="card-content">
                     <div class="card-header-section">
@@ -904,7 +815,6 @@ const app = {
                     </div>
                     <div class="page-card-count">${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}</div>
                     ${page.description ? `<p class="page-card-description">${utils.escapeHtml(page.description.substring(0, 160))}${page.description.length > 160 ? '...' : ''}</p>` : ''}
-                    ${tagsMarkup}
                     ${scriptNames ? `<div class="page-card-scripts">${scriptNames}${utils.escapeHtml(moreCount)}</div>` : ''}
                     <div class="card-meta">
                         <span>${new Date(page.created).toLocaleDateString('en-US')}</span>
@@ -919,16 +829,11 @@ const app = {
     },
 
     filterLogic(pages) {
-        const query = this.searchQuery.trim().toLowerCase();
-        const tagQuery = this.currentTag.trim().toLowerCase();
+        const query = this.searchQuery.toLowerCase();
         return pages.filter(page => {
-            const pageTags = this.normalizeTags(page.tags || []);
-            const matchesSearch = !query || page.title.toLowerCase().includes(query) ||
-                (page.description || '').toLowerCase().includes(query) ||
-                pageTags.some(tag => tag.toLowerCase().includes(query)) ||
+            const matchesSearch = page.title.toLowerCase().includes(query) ||
                 Object.values(page.scripts || {}).some(script => (script.name || '').toLowerCase().includes(query));
             if (!matchesSearch) return false;
-            if (tagQuery && !pageTags.some(tag => tag.toLowerCase() === tagQuery)) return false;
             if (page.visibility === 'PRIVATE' && !this.currentUser) return false;
             if (page.visibility === 'UNLISTED' && !this.currentUser) return false;
             if (this.currentFilter === 'private' && page.visibility !== 'PRIVATE') return false;
@@ -976,16 +881,24 @@ const app = {
         document.querySelector(`[data-admin-tab="${CSS.escape(navTab)}"]`)?.classList.add('active');
 
         if (tab === 'list') {
-            document.getElementById('admin-tab-list').style.display = 'block';
+            const panel = document.getElementById('admin-tab-list');
+            panel.style.display = 'block';
+            this.animateEntry(panel, 'tab-enter');
             this.renderAdminList();
         } else if (tab === 'bots') {
-            document.getElementById('admin-tab-bots').style.display = 'block';
+            const panel = document.getElementById('admin-tab-bots');
+            panel.style.display = 'block';
+            this.animateEntry(panel, 'tab-enter');
             this.renderBotsList();
         } else if (tab === 'create-bot') {
-            document.getElementById('admin-tab-bot-editor').style.display = 'block';
+            const panel = document.getElementById('admin-tab-bot-editor');
+            panel.style.display = 'block';
+            this.animateEntry(panel, 'tab-enter');
             if (!options.preserveEditor) this.resetBotEditor();
         } else {
-            document.getElementById('admin-tab-editor').style.display = 'block';
+            const panel = document.getElementById('admin-tab-editor');
+            panel.style.display = 'block';
+            this.animateEntry(panel, 'tab-enter');
             if (tab === 'create' && !options.preserveEditor) this.resetEditor();
             setTimeout(() => this.initCodeMirror(), 50);
         }
@@ -1016,8 +929,6 @@ const app = {
             const updated = page.updated ? new Date(page.updated).toLocaleDateString('en-US') : new Date(page.created).toLocaleDateString('en-US');
             const names = scripts.slice(0, 4).map(script => `<span class="script-chip">${utils.escapeHtml(script.name)}</span>`).join('');
             const extra = scripts.length > 4 ? `<span class="script-chip script-chip-muted">+${scripts.length - 4}</span>` : '';
-            const pageTags = this.normalizeTags(page.tags || []);
-            const tagChips = pageTags.map(tag => `<span class="script-chip tag-chip">#${utils.escapeHtml(tag)}</span>`).join('');
 
             return `<div class="admin-item modern-admin-item" data-page-title="${utils.escapeHtml(page.title)}" data-page-id="${utils.escapeHtml(page.id)}" onclick="app.populateEditor('${String(page.id).replace(/'/g, "\'")}')">
                 <div class="admin-item-icon" aria-hidden="true">
@@ -1032,7 +943,7 @@ const app = {
                         <span class="badge badge-sm badge-${(page.visibility || 'PUBLIC').toLowerCase()}">${page.visibility || 'PUBLIC'}</span>
                     </div>
                     ${page.description ? `<p class="admin-description">${utils.escapeHtml(page.description.substring(0, 150))}${page.description.length > 150 ? '...' : ''}</p>` : ''}
-                    <div class="admin-script-chips">${names}${extra}${tagChips}</div>
+                    <div class="admin-script-chips">${names}${extra}</div>
                     <div class="admin-meta">
                         <span>${scripts.length} ${scripts.length === 1 ? 'script' : 'scripts'}</span>
                         <span class="text-muted">Updated ${updated}</span>
@@ -1432,9 +1343,6 @@ const app = {
         if (visibility) visibility.value = 'PUBLIC';
         const desc = document.getElementById('edit-desc');
         if (desc) desc.value = '';
-        const tags = document.getElementById('edit-tags');
-        if (tags) tags.value = '';
-        this.renderTagPreview('');
 
         const builder = document.getElementById('script-builder');
         if (builder) builder.innerHTML = '';
@@ -1574,9 +1482,6 @@ const app = {
         document.getElementById('edit-page-title').value = page.displayTitle || page.title;
         document.getElementById('edit-visibility').value = page.visibility || 'PUBLIC';
         document.getElementById('edit-desc').value = page.description || '';
-        const tagsInput = document.getElementById('edit-tags');
-        if (tagsInput) tagsInput.value = this.normalizeTags(page.tags || []).join(', ');
-        this.renderTagPreview(tagsInput?.value || '');
 
         const builder = document.getElementById('script-builder');
         if (builder) builder.innerHTML = '';
@@ -1686,13 +1591,11 @@ const app = {
         const titleInput = document.getElementById('edit-page-title');
         const visibilityInput = document.getElementById('edit-visibility');
         const descInput = document.getElementById('edit-desc');
-        const tagsInput = document.getElementById('edit-tags');
         const saveBtn = document.querySelector('.editor-footer .btn-primary');
 
         const title = titleInput?.value.trim() || '';
         const visibility = visibilityInput?.value || 'PUBLIC';
         const description = descInput?.value.trim() || '';
-        const tags = this.normalizeTags(tagsInput?.value || '');
         const scriptEntries = this.collectPageScripts();
         const originalBtnText = saveBtn?.textContent || 'Publish Page';
 
@@ -1783,7 +1686,6 @@ const app = {
             displayTitle: title,
             visibility,
             description,
-            tags,
             created,
             updated: now,
             scripts
@@ -1889,7 +1791,6 @@ const app = {
         const manifestJson = JSON.stringify(scriptManifest).replace(/</g, '\\u003c');
         const pageTitleJson = JSON.stringify(pageData.title).replace(/</g, '\\u003c');
         const descriptionJson = JSON.stringify(pageData.description || '').replace(/</g, '\\u003c');
-        const pageTagsJson = JSON.stringify(this.normalizeTags(pageData.tags || [])).replace(/</g, '\\u003c');
 
         const scriptViewerHTML = `<!DOCTYPE html>
 <html lang="en">
@@ -1898,7 +1799,7 @@ const app = {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${utils.escapeHtml(pageData.title)} - CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/png" href="../../assets/favicon.ico">
-    <link rel="stylesheet" href="../../style.css?v=20260926-tags-search-v1">
+    <link rel="stylesheet" href="../../style.css?v=20260925-admin-v2">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -1908,8 +1809,6 @@ const app = {
         .page-hero .eyebrow { color:#ff8f8f; font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.16em; }
         .page-hero h1 { margin:8px 0 8px; font-size: clamp(28px,4vw,44px); letter-spacing:-1.5px; }
         .page-hero p { max-width: 760px; color:#d4aeb2; font-size:14px; }
-        .page-hero-tags { display:flex; flex-wrap:wrap; gap:7px; margin-top:14px; }
-        .page-hero-tag { display:inline-flex; align-items:center; padding:5px 9px; border-radius:999px; border:1px solid rgba(255,84,84,.20); background:rgba(255,59,59,.08); color:#ffb3b3; font-size:11px; font-weight:700; }
         .page-layout { display:grid; grid-template-columns:280px minmax(0,1fr); gap:18px; align-items:start; }
         .script-nav { position:sticky; top:88px; padding:12px; border:1px solid rgba(255,84,84,.18); border-radius:18px; background:rgba(25,5,10,.88); box-shadow:0 18px 45px rgba(72,0,14,.22); }
         .script-nav-title { padding:10px 10px 12px; font-size:11px; text-transform:uppercase; letter-spacing:.14em; color:#c99ca3; font-weight:800; }
@@ -1956,7 +1855,6 @@ const app = {
             <span class="eyebrow">Script Page</span>
             <h1 id="page-title"></h1>
             <p id="page-description"></p>
-            <div id="page-tags" class="page-hero-tags" aria-label="Page tags"></div>
         </header>
 
         <div class="page-layout">
@@ -1985,20 +1883,12 @@ const app = {
     <script>
         const pageTitle = ${pageTitleJson};
         const pageDescription = ${descriptionJson};
-        const pageTags = ${pageTagsJson};
         const scripts = ${manifestJson};
 
         let activeScript = scripts[0] || null;
 
         document.getElementById('page-title').textContent = pageTitle;
         document.getElementById('page-description').textContent = pageDescription;
-        const pageTagsEl = document.getElementById('page-tags');
-        pageTags.forEach(function(tag) {
-            const tagEl = document.createElement('span');
-            tagEl.className = 'page-hero-tag';
-            tagEl.textContent = '#' + tag;
-            pageTagsEl.appendChild(tagEl);
-        });
 
         function renderScriptNav() {
             const nav = document.getElementById('script-nav-items');
@@ -2126,10 +2016,14 @@ const app = {
                 location.hash = '';
                 return;
             }
-            document.getElementById('view-admin').style.display = 'block';
+            const adminView = document.getElementById('view-admin');
+            adminView.style.display = 'block';
+            this.animateEntry(adminView, 'route-enter');
             this.switchAdminTab('list');
         } else {
-            document.getElementById('view-home').style.display = 'block';
+            const homeView = document.getElementById('view-home');
+            homeView.style.display = 'block';
+            this.animateEntry(homeView, 'route-enter');
         }
     }
 };
