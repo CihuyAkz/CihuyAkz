@@ -28,7 +28,8 @@
           "updated": "2026-09-25T13:26:11.371Z"
         }
       },
-      "filename": "index.html"
+      "filename": "index.html",
+      "tags": []
     },
     "advanced-r6-animation": {
       "id": "advanced-r6-animation",
@@ -67,7 +68,8 @@
           "updated": "2026-09-25T13:35:56.596Z"
         }
       },
-      "filename": "index.html"
+      "filename": "index.html",
+      "tags": []
     },
     "npc-animation": {
       "id": "npc-animation",
@@ -88,7 +90,8 @@
           "updated": "2026-09-26T07:50:38.612Z"
         }
       },
-      "filename": "index.html"
+      "filename": "index.html",
+      "tags": []
     }
   },
   "bots": {}

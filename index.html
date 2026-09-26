@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CihuyAkz Studio Lite</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="style.css?v=20260925-admin-v2">
+    <link rel="stylesheet" href="style.css?v=20260926-tags-search-v1">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/nprogress/0.2.0/nprogress.min.css">
@@ -26,12 +26,17 @@
             </div>
             
             <div class="nav-center">
-                <div class="search-wrapper">
-                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <div class="search-wrapper" id="search-wrapper">
+                    <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
                         <circle cx="11" cy="11" r="8"></circle>
                         <path d="m21 21-4.35-4.35"></path>
                     </svg>
-                    <input type="text" id="search" placeholder="Search pages or scripts..." aria-label="Search pages or scripts">
+                    <input type="text" id="search" placeholder="Search pages, scripts, or tags..." aria-label="Search pages, scripts, or tags" autocomplete="off">
+                    <button type="button" class="search-cancel" id="search-cancel" aria-label="Cancel search" title="Cancel search">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                            <path d="M6 6l12 12M18 6L6 18"></path>
+                        </svg>
+                    </button>
                 </div>
             </div>
 
@@ -100,6 +105,12 @@
                                 </svg>
                                 Unlisted
                             </a>
+                        </div>
+                    </div>
+                    <div class="sidebar-section sidebar-tags-section">
+                        <h3 class="sidebar-title">Tags</h3>
+                        <div id="tag-filters" class="tag-filters" aria-label="Filter by tag">
+                            <span class="tag-filter-empty">No tags yet</span>
                         </div>
                     </div>
                     <div class="sidebar-section sidebar-sort">
@@ -244,6 +255,12 @@
                             <div class="form-group page-description-field">
                                 <label for="edit-desc">Page Description</label>
                                 <textarea id="edit-desc" class="input-field" rows="3" placeholder="Explain what this page contains..."></textarea>
+                            </div>
+                            <div class="form-group page-tags-field">
+                                <label for="edit-tags">Tags</label>
+                                <input type="text" id="edit-tags" class="input-field" placeholder="animation, r6, npc" autocomplete="off">
+                                <small class="field-hint">Separate tags with commas. Up to 8 tags, 24 characters each.</small>
+                                <div id="edit-tags-preview" class="tag-preview" aria-live="polite"></div>
                             </div>
                         </div>
 
