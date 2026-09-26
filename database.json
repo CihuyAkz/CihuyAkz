@@ -73,10 +73,10 @@
       "id": "npc-animation",
       "title": "NPC Animation",
       "displayTitle": "NPC Animation",
-      "visibility": "UNLISTED",
+      "visibility": "PUBLIC",
       "description": "Animation Idle For NPC",
       "created": "2026-09-26T07:18:31.888Z",
-      "updated": "2026-09-26T07:18:31.888Z",
+      "updated": "2026-09-26T07:50:38.612Z",
       "scripts": {
         "local-script": {
           "id": "local-script",
@@ -85,7 +85,7 @@
           "filename": "local-script.lua",
           "size": 4169,
           "created": "2026-09-26T07:18:31.888Z",
-          "updated": "2026-09-26T07:18:31.888Z"
+          "updated": "2026-09-26T07:50:38.612Z"
         }
       },
       "filename": "index.html"
